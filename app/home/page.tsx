@@ -1,0 +1,568 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { createWorker } from 'tesseract.js';
+import toast from 'react-hot-toast';
+import axios from 'axios';
+import Chatbot from '../components/Chatbot';
+import UserPreferences from '../components/UserPreferences';
+import { useUser } from '../context/UserContext';
+import { getTranslation } from '../translations';
+
+interface MedicineInfo {
+  id: string;
+  name: string;
+  overview: string;
+  ingredients: string[];
+  sideEffects: string[];
+  herbalAlternatives: string[];
+  aiGeneratedInfo?: {
+    primaryUses: string[];
+    conditionsTreated: string[];
+    additionalUses: string[];
+    mechanismOfAction: string;
+    dosageInfo: string;
+    contraindications: string[];
+  };
+}
+
+// Add type definition for Tesseract worker
+interface TesseractWorker extends Worker {
+  loadLanguage: (lang: string) => Promise<void>;
+  initialize: (lang: string) => Promise<void>;
+  recognize: (image: File) => Promise<{ data: { text: string } }>;
+}
+
+export default function Home() {
+  const { preferences, addRecentlyViewed, toggleSavedMedicine } = useUser();
+  const [image, setImage] = useState<string | null>(null);
+  const [extractedText, setExtractedText] = useState<string>('');
+  const [medicineInfo, setMedicineInfo] = useState<MedicineInfo | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [recommendations, setRecommendations] = useState<MedicineInfo[]>([]);
+  const [showPreferences, setShowPreferences] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isGeneratingInfo, setIsGeneratingInfo] = useState(false);
+
+  const generateMedicineInfo = async (medicineName: string, extractedText?: string) => {
+    setIsGeneratingInfo(true);
+    try {
+      const response = await axios.post('/api/generate-medicine-info', {
+        medicineName,
+        extractedText
+      });
+
+      if (medicineInfo) {
+        setMedicineInfo({
+          ...medicineInfo,
+          aiGeneratedInfo: response.data
+        });
+      }
+    } catch (error) {
+      console.error('Error generating medicine info:', error);
+      toast.error('Failed to generate detailed medicine information');
+    }
+    setIsGeneratingInfo(false);
+  };
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: {
+      'image/*': ['.jpeg', '.jpg', '.png']
+    },
+    maxFiles: 1,
+    onDrop: async (acceptedFiles) => {
+      const file = acceptedFiles[0];
+      const imageUrl = URL.createObjectURL(file);
+      setImage(imageUrl);
+      
+      setLoading(true);
+      try {
+        const worker = await createWorker() as unknown as TesseractWorker;
+        await worker.loadLanguage('eng');
+        await worker.initialize('eng');
+        const { data: { text } } = await worker.recognize(file);
+        setExtractedText(text);
+        await worker.terminate();
+        
+        const response = await axios.post('/api/analyze', { text });
+        setMedicineInfo(response.data);
+        if (response.data.id) {
+          addRecentlyViewed(response.data.id);
+        }
+
+        // Generate AI-powered information
+        await generateMedicineInfo(response.data.name, text);
+      } catch (error) {
+        console.error('Error processing image:', error);
+        setError('Failed to process image. Please try again.');
+      }
+      setLoading(false);
+    }
+  });
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    
+    setLoading(true);
+    try {
+      const response = await axios.post('/api/search', { query: searchQuery });
+      setMedicineInfo(response.data);
+      if (response.data.id) {
+        addRecentlyViewed(response.data.id);
+      }
+      setImage(null);
+      setExtractedText('');
+      
+      // Generate AI-powered information
+      await generateMedicineInfo(response.data.name);
+    } catch (error) {
+      toast.error('Error searching medicine');
+      console.error(error);
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteImage = () => {
+    setImage(null);
+    setExtractedText('');
+    setMedicineInfo(null);
+  };
+
+  useEffect(() => {
+    const loadRecommendations = async () => {
+      try {
+        const response = await axios.post('/api/recommendations', {
+          healthConditions: preferences.healthConditions,
+          allergies: preferences.allergies,
+          recentlyViewed: preferences.recentlyViewed,
+        });
+        setRecommendations(response.data);
+      } catch (error) {
+        console.error('Error loading recommendations:', error);
+      }
+    };
+
+    loadRecommendations();
+  }, [preferences.healthConditions, preferences.allergies, preferences.recentlyViewed]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
+  return (
+    <main className={`min-h-screen ${preferences.theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gradient-to-b from-blue-50 to-white'}`}>
+      {/* Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold text-blue-600">
+              {getTranslation('app.title', preferences.language)}
+            </h1>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setShowPreferences(!showPreferences)}
+                className="p-2 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {showPreferences && (
+          <div className="mb-8 bg-white rounded-xl shadow-lg p-6">
+            <UserPreferences />
+          </div>
+        )}
+
+        {/* Chatbot Section */}
+        <div className="mb-8">
+          <div className="bg-white rounded-xl shadow-lg">
+            <div className="p-4 bg-blue-600 text-white rounded-t-xl">
+              <h3 className="font-semibold">
+                {getTranslation('chatbot.title', preferences.language)}
+              </h3>
+            </div>
+            <div className="h-[300px] overflow-y-auto p-4">
+              <Chatbot isFixed={true} />
+            </div>
+          </div>
+        </div>
+
+        {/* Search Section */}
+        <div className="mb-8">
+          <div className="flex gap-4">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={getTranslation('app.search.placeholder', preferences.language)}
+                className="w-full p-4 pl-12 border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <button
+              onClick={handleSearch}
+              className="px-6 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-lg flex items-center gap-2"
+            >
+              <span>{getTranslation('app.search.button', preferences.language)}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Image Upload Section */}
+        <div className="mb-8">
+          {!image ? (
+            <div
+              {...getRootProps()}
+              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all max-w-md mx-auto ${
+                isDragActive 
+                  ? 'border-blue-500 bg-blue-50' 
+                  : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
+              }`}
+            >
+              <input {...getInputProps()} />
+              <div className="text-gray-600">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-3 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="text-base font-medium">Drag and drop an image here, or click to select</p>
+                <p className="text-xs text-gray-500 mt-1">Supports JPG, JPEG, and PNG</p>
+              </div>
+            </div>
+          ) : (
+            <div className="relative max-w-md mx-auto">
+              <div className="bg-white rounded-xl shadow-lg p-4">
+                <div className="relative w-full">
+                  <div className="aspect-[3/2] w-full overflow-hidden rounded-lg bg-gray-50">
+                    <img
+                      src={image}
+                      alt="Uploaded medicine"
+                      className="w-full h-full object-contain"
+                    />
+                    <button
+                      onClick={handleDeleteImage}
+                      className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                      title="Delete image"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-3 flex justify-between items-center">
+                  <p className="text-sm text-gray-500">Image uploaded successfully</p>
+                  <button
+                    onClick={() => {
+                      setImage(null);
+                      setExtractedText('');
+                      setMedicineInfo(null);
+                    }}
+                    className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Upload another image
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Recommendations */}
+        {recommendations.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-6 text-gray-900">Recommended for You</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {recommendations.map((medicine) => (
+                <div key={medicine.id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+                  <div className="flex justify-between items-start">
+                    <h3 className="text-xl font-semibold text-gray-900">{medicine.name}</h3>
+                    <button
+                      onClick={() => toggleSavedMedicine(medicine.id)}
+                      className="text-gray-400 hover:text-blue-500 transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                    </button>
+                  </div>
+                  <p className="text-gray-600 mt-2">{medicine.overview}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Extracted Text */}
+        {extractedText && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-6 text-gray-900">Extracted Text</h2>
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <p className="whitespace-pre-wrap text-gray-700">{extractedText}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Medicine Info */}
+        {medicineInfo && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-6 text-gray-900">Medicine Information</h2>
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="mb-8">
+                <h3 className="text-2xl font-bold mb-4 text-gray-900">{medicineInfo.name}</h3>
+                <div className="bg-blue-50 rounded-xl p-6">
+                  <h4 className="text-lg font-semibold mb-3 text-blue-900">Overview</h4>
+                  <div className="space-y-4">
+                    {isGeneratingInfo ? (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <span className="ml-3 text-blue-800">Generating detailed information...</span>
+                      </div>
+                    ) : medicineInfo.aiGeneratedInfo ? (
+                      <>
+                        <div>
+                          <h5 className="font-medium text-blue-900 mb-2">Primary Uses</h5>
+                          <div className="bg-white rounded-lg p-4 shadow-sm">
+                            <ul className="space-y-2">
+                              {medicineInfo.aiGeneratedInfo.primaryUses.map((use, index) => (
+                                <li key={index} className="text-blue-800 flex items-start">
+                                  <span className="text-blue-500 mr-2">•</span>
+                                  {use}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                        <div>
+                          <h5 className="font-medium text-blue-900 mb-2">Conditions Treated</h5>
+                          <div className="bg-white rounded-lg p-4 shadow-sm">
+                            <div className="space-y-3">
+                              <div>
+                                <h6 className="text-sm font-medium text-blue-700 mb-2">Primary Conditions:</h6>
+                                <ul className="space-y-2">
+                                  {medicineInfo.aiGeneratedInfo.conditionsTreated.map((condition, index) => (
+                                    <li key={index} className="text-blue-800 flex items-start">
+                                      <span className="text-blue-500 mr-2">•</span>
+                                      {condition}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                              <div>
+                                <h6 className="text-sm font-medium text-blue-700 mb-2">Additional Uses:</h6>
+                                <ul className="space-y-2">
+                                  {medicineInfo.aiGeneratedInfo.additionalUses.map((use, index) => (
+                                    <li key={index} className="text-blue-800 flex items-start">
+                                      <span className="text-blue-500 mr-2">•</span>
+                                      {use}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <h5 className="font-medium text-blue-900 mb-2">Mechanism of Action</h5>
+                          <div className="bg-white rounded-lg p-4 shadow-sm">
+                            <p className="text-blue-800 leading-relaxed">
+                              {medicineInfo.aiGeneratedInfo.mechanismOfAction}
+                            </p>
+                          </div>
+                        </div>
+                        <div>
+                          <h5 className="font-medium text-blue-900 mb-2">Dosage Information</h5>
+                          <div className="bg-white rounded-lg p-4 shadow-sm">
+                            <p className="text-blue-800 leading-relaxed">
+                              {medicineInfo.aiGeneratedInfo.dosageInfo}
+                            </p>
+                          </div>
+                        </div>
+                        <div>
+                          <h5 className="font-medium text-blue-900 mb-2">Contraindications</h5>
+                          <div className="bg-white rounded-lg p-4 shadow-sm">
+                            <ul className="space-y-2">
+                              {medicineInfo.aiGeneratedInfo.contraindications.map((contraindication, index) => (
+                                <li key={index} className="text-blue-800 flex items-start">
+                                  <span className="text-blue-500 mr-2">•</span>
+                                  {contraindication}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="bg-white rounded-lg p-4 shadow-sm">
+                        <p className="text-blue-800 leading-relaxed">{medicineInfo.overview}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-blue-50 rounded-xl p-4">
+                  <h4 className="font-semibold mb-3 text-blue-900">Active & Inactive Ingredients</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <h5 className="text-sm font-medium text-blue-800 mb-1">Active Ingredients:</h5>
+                      <ul className="space-y-1">
+                        {medicineInfo.ingredients
+                          .filter(ing => ing.toLowerCase().includes('active'))
+                          .map((ingredient, index) => (
+                            <li key={index} className="text-blue-800 flex items-start">
+                              <span className="text-blue-500 mr-2">•</span>
+                              {ingredient.replace('Active:', '').trim()}
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h5 className="text-sm font-medium text-blue-800 mb-1">Inactive Ingredients:</h5>
+                      <ul className="space-y-1">
+                        {medicineInfo.ingredients
+                          .filter(ing => !ing.toLowerCase().includes('active'))
+                          .map((ingredient, index) => (
+                            <li key={index} className="text-blue-800 flex items-start">
+                              <span className="text-blue-500 mr-2">•</span>
+                              {ingredient}
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-red-50 rounded-xl p-4">
+                  <h4 className="font-semibold mb-3 text-red-900">Side Effects & Warnings</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <h5 className="text-sm font-medium text-red-800 mb-1">Common Side Effects:</h5>
+                      <ul className="space-y-1">
+                        {medicineInfo.sideEffects
+                          .filter(effect => !effect.toLowerCase().includes('severe'))
+                          .map((effect, index) => (
+                            <li key={index} className="text-red-800 flex items-start">
+                              <span className="text-red-500 mr-2">•</span>
+                              {effect}
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h5 className="text-sm font-medium text-red-800 mb-1">Severe Side Effects:</h5>
+                      <ul className="space-y-1">
+                        {medicineInfo.sideEffects
+                          .filter(effect => effect.toLowerCase().includes('severe'))
+                          .map((effect, index) => (
+                            <li key={index} className="text-red-800 flex items-start">
+                              <span className="text-red-500 mr-2">•</span>
+                              {effect}
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-green-50 rounded-xl p-4">
+                  <h4 className="font-semibold mb-3 text-green-900">Natural Alternatives</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <h5 className="text-sm font-medium text-green-800 mb-1">Herbal Alternatives:</h5>
+                      <ul className="space-y-1">
+                        {medicineInfo.herbalAlternatives.map((alternative, index) => (
+                          <li key={index} className="text-green-800 flex items-start">
+                            <span className="text-green-500 mr-2">•</span>
+                            {alternative}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-green-200">
+                      <p className="text-sm text-green-800 italic">
+                        Note: Always consult with a healthcare provider before switching to herbal alternatives.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Information */}
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <h4 className="font-semibold mb-3 text-gray-900">Usage Instructions</h4>
+                  <p className="text-gray-700">
+                    Please consult your healthcare provider for specific dosage instructions. 
+                    This information is for general reference only.
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <h4 className="font-semibold mb-3 text-gray-900">Precautions</h4>
+                  <p className="text-gray-700">
+                    Always read the label and follow the instructions carefully. 
+                    Keep out of reach of children. Store in a cool, dry place.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Floating Chat Button */}
+        <button
+          onClick={() => setIsChatOpen(!isChatOpen)}
+          className="fixed bottom-6 right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-colors z-50"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+          </svg>
+        </button>
+
+        {/* Chat Window */}
+        {isChatOpen && (
+          <div className="fixed bottom-24 right-6 w-96 bg-white rounded-xl shadow-2xl z-50">
+            <div className="p-4 bg-blue-600 text-white rounded-t-xl flex justify-between items-center">
+              <h3 className="font-semibold">Chat with Medlex.ai</h3>
+              <button
+                onClick={() => setIsChatOpen(false)}
+                className="text-white hover:text-gray-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="h-96 overflow-y-auto p-4">
+              <Chatbot isFixed={true} />
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+} 
