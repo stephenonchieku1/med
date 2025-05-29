@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useUser } from './context/UserContext';
-import Home from './home';  
+import Home from './home/page';  
 import Link from 'next/link';
 import Image from 'next/image';
 
