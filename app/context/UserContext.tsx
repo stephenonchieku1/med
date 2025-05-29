@@ -22,23 +22,27 @@ interface EmergencyContact {
   phone: string;
 }
 
-interface Preferences {
+export interface Preferences {
   language: Language;
   secondaryLanguage: Language | null;
+  diet: Diet;
   theme: Theme;
   fontSize: FontSize;
-  notifications: boolean;
+  exerciseLevel: ExerciseLevel;
+  healthConditions: string[];
+  allergies: string[];
+  savedMedicines: string[];
+  recentlyViewed: string[];
+  age: number;
+  gender: Sex;
   ageRange: string | null;
-  sex: Sex | null;
   weight: number | null;
   height: number | null;
   lifestyle: Lifestyle;
   currentMedications: string[];
   medicalHistory: string[];
-  healthConditions: string[];
-  allergies: string[];
+  notifications: boolean;
   emergencyContact: EmergencyContact | null;
-  recentlyViewed: string[];
 }
 
 interface UserContextType {
@@ -68,11 +72,17 @@ interface UserContextType {
 const defaultPreferences: Preferences = {
   language: 'en',
   secondaryLanguage: null,
+  diet: 'omnivore',
   theme: 'light',
   fontSize: 'medium',
-  notifications: true,
+  exerciseLevel: 'none',
+  healthConditions: [],
+  allergies: [],
+  savedMedicines: [],
+  recentlyViewed: [],
+  age: 0,
+  gender: 'male',
   ageRange: null,
-  sex: null,
   weight: null,
   height: null,
   lifestyle: {
@@ -83,10 +93,8 @@ const defaultPreferences: Preferences = {
   },
   currentMedications: [],
   medicalHistory: [],
-  healthConditions: [],
-  allergies: [],
-  emergencyContact: null,
-  recentlyViewed: []
+  notifications: true,
+  emergencyContact: null
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
