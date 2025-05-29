@@ -243,13 +243,12 @@ const UserPreferences: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Sex</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
             <select
-              value={preferences.sex || ''}
-              onChange={(e) => updatePreferences({ sex: e.target.value as 'male' | 'female' | 'other' | null })}
-              className="w-full p-2 border rounded-lg"
+              value={preferences.gender}
+              onChange={(e) => updatePreferences({ gender: e.target.value as 'male' | 'female' | 'other' })}
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="">Select sex</option>
               <option value="male">Male</option>
               <option value="female">Female</option>
               <option value="other">Other</option>
