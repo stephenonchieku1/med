@@ -1,38 +1,71 @@
 import { NextResponse } from 'next/server';
-import axios from 'axios';
+
+// Mock database of medicine information
+const medicineDatabase = {
+  'quinine': {
+    id: 'quinine-001',
+    name: 'Quinine',
+    overview: 'Quinine is a medication used to treat malaria and babesiosis.',
+    ingredients: [
+      'Active: Quinine sulfate',
+      'Inactive: Starch, Magnesium stearate, Talc'
+    ],
+    sideEffects: [
+      'Common: Nausea, vomiting, headache',
+      'Severe: Cardiac arrhythmias, Thrombocytopenia'
+    ],
+    herbalAlternatives: [
+      'Artemisia annua (Sweet wormwood)',
+      'Cinchona bark'
+    ]
+  },
+  'aspirin': {
+    id: 'aspirin-001',
+    name: 'Aspirin',
+    overview: 'Aspirin is used to reduce fever and relieve mild to moderate pain.',
+    ingredients: [
+      'Active: Acetylsalicylic acid',
+      'Inactive: Cellulose, Corn starch, Hypromellose'
+    ],
+    sideEffects: [
+      'Common: Upset stomach, heartburn',
+      'Severe: Stomach bleeding, Allergic reactions'
+    ],
+    herbalAlternatives: [
+      'Willow bark',
+      'White willow'
+    ]
+  }
+};
 
 export async function POST(request: Request) {
   try {
     const { query } = await request.json();
 
-    // Here you would typically integrate with a medical database or AI service
-    // For now, we'll return mock data
-    const mockResponse = {
-      overview: `Information about ${query}. This medicine is commonly used for treating various conditions. Always consult with a healthcare professional before use.`,
-      ingredients: [
-        "Active Ingredient 1",
-        "Active Ingredient 2",
-        "Inactive Ingredient 1",
-        "Inactive Ingredient 2"
-      ],
-      sideEffects: [
-        "Common: Headache, nausea",
-        "Serious: Allergic reactions (rare)",
-        "Other: Drowsiness, dizziness"
-      ],
-      herbalAlternatives: [
-        "Ginger: Natural anti-inflammatory",
-        "Turmeric: Pain relief properties",
-        "Peppermint: Digestive aid"
-      ]
-    };
+    if (!query) {
+      return NextResponse.json({
+        error: 'Search query is required'
+      }, { status: 400 });
+    }
 
-    return NextResponse.json(mockResponse);
+    // Normalize search query
+    const normalizedQuery = query.toLowerCase().trim();
+    
+    // Search in our database
+    const medicineInfo = medicineDatabase[normalizedQuery];
+    
+    if (!medicineInfo) {
+      return NextResponse.json({
+        error: 'Medicine not found'
+      }, { status: 404 });
+    }
+
+    return NextResponse.json(medicineInfo);
+
   } catch (error) {
     console.error('Error searching medicine:', error);
-    return NextResponse.json(
-      { error: 'Failed to search medicine' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      error: 'Failed to search medicine'
+    }, { status: 500 });
   }
 } 
