@@ -24,6 +24,7 @@ interface MedicineInfo {
     mechanismOfAction: string;
     dosageInfo: string;
     contraindications: string[];
+    personalizedInfo: string;
   };
 }
 
@@ -48,25 +49,55 @@ export default function Home() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isGeneratingInfo, setIsGeneratingInfo] = useState(false);
 
-  const generateMedicineInfo = async (medicineName: string, extractedText?: string) => {
-    setIsGeneratingInfo(true);
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    
+    setLoading(true);
     try {
+      // Generate medicine information
       const response = await axios.post('/api/generate-medicine-info', {
-        medicineName,
-        extractedText
+        medicineName: searchQuery
       });
-
-      if (medicineInfo) {
-        setMedicineInfo({
-          ...medicineInfo,
-          aiGeneratedInfo: response.data
-        });
+      
+      if (response.data.error) {
+        toast.error(response.data.error);
+        return;
       }
+
+      // Create a complete medicine info object
+      const medicineData = {
+        id: searchQuery.toLowerCase(),
+        name: searchQuery,
+        overview: response.data.personalizedInfo,
+        ingredients: [
+          ...response.data.ingredients.active.map((ing: string) => `Active: ${ing}`),
+          ...response.data.ingredients.inactive.map((ing: string) => `Inactive: ${ing}`)
+        ],
+        sideEffects: response.data.sideEffects,
+        herbalAlternatives: [], // This would come from a separate API
+        aiGeneratedInfo: {
+          primaryUses: response.data.primaryUses,
+          conditionsTreated: response.data.conditionsTreated,
+          additionalUses: response.data.additionalUses,
+          mechanismOfAction: response.data.mechanismOfAction,
+          dosageInfo: response.data.dosageInfo,
+          contraindications: response.data.contraindications,
+          personalizedInfo: response.data.personalizedInfo
+        }
+      };
+      
+      setMedicineInfo(medicineData);
+      
+      if (medicineData.id) {
+        addRecentlyViewed(medicineData.id);
+      }
+      setImage(null);
+      setExtractedText('');
     } catch (error) {
-      console.error('Error generating medicine info:', error);
-      toast.error('Failed to generate detailed medicine information');
+      console.error('Error searching medicine:', error);
+      toast.error('Failed to fetch medicine information');
     }
-    setIsGeneratingInfo(false);
+    setLoading(false);
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -81,50 +112,117 @@ export default function Home() {
       
       setLoading(true);
       try {
+        // Extract text from image
         const worker = await createWorker() as unknown as TesseractWorker;
         await worker.loadLanguage('eng');
         await worker.initialize('eng');
-        const { data: { text } } = await worker.recognize(file);
-        setExtractedText(text);
+        
+        const result = await worker.recognize(file);
+        const extractedText = result.data.text;
         await worker.terminate();
         
-        const response = await axios.post('/api/analyze', { text });
-        setMedicineInfo(response.data);
-        if (response.data.id) {
-          addRecentlyViewed(response.data.id);
+        if (!extractedText || extractedText.trim().length === 0) {
+          throw new Error('No text could be extracted from the image');
+        }
+        
+        setExtractedText(extractedText);
+        
+        // Extract medicine name from text (improved logic)
+        const lines = extractedText.split('\n')
+          .map(line => line.trim())
+          .filter(line => line.length > 0);
+        
+        // Look for common medicine name patterns
+        const medicineNamePatterns = [
+          /(?:brand|generic|trade)\s*name:?\s*([^\n]+)/i,
+          /(?:active|main)\s*ingredient:?\s*([^\n]+)/i,
+          /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)$/m
+        ];
+        
+        let medicineName = '';
+        for (const pattern of medicineNamePatterns) {
+          const match = extractedText.match(pattern);
+          if (match && match[1]) {
+            medicineName = match[1].trim();
+            break;
+          }
+        }
+        
+        // If no pattern match, use the first non-empty line
+        if (!medicineName && lines.length > 0) {
+          medicineName = lines[0];
+        }
+        
+        if (!medicineName) {
+          throw new Error('Could not identify medicine name from the image');
+        }
+        
+        // Clean up medicine name
+        medicineName = medicineName
+          .replace(/[^\w\s-]/g, '') // Remove special characters
+          .replace(/\s+/g, ' ')     // Normalize spaces
+          .trim();
+        
+        // Generate medicine information
+        const response = await axios.post('/api/generate-medicine-info', {
+          medicineName,
+          extractedText,
+          userPreferences: preferences
+        });
+        
+        if (response.data.error) {
+          throw new Error(response.data.error);
         }
 
-        // Generate AI-powered information
-        await generateMedicineInfo(response.data.name, text);
+        // Create a complete medicine info object
+        const medicineData = {
+          id: medicineName.toLowerCase(),
+          name: medicineName,
+          overview: response.data.personalizedInfo || 'Information not available',
+          ingredients: [
+            ...(response.data.ingredients?.active || []).map((ing: string) => `Active: ${ing}`),
+            ...(response.data.ingredients?.inactive || []).map((ing: string) => `Inactive: ${ing}`)
+          ],
+          sideEffects: response.data.sideEffects || ['Information not available'],
+          herbalAlternatives: response.data.herbalAlternatives || ['Information not available'],
+          aiGeneratedInfo: {
+            primaryUses: response.data.primaryUses || ['Information not available'],
+            conditionsTreated: response.data.conditionsTreated || ['Information not available'],
+            additionalUses: response.data.additionalUses || ['Information not available'],
+            mechanismOfAction: response.data.mechanismOfAction || 'Information not available',
+            dosageInfo: response.data.dosageInfo || 'Information not available',
+            contraindications: response.data.contraindications || ['Information not available'],
+            personalizedInfo: response.data.personalizedInfo || 'Information not available'
+          }
+        };
+        
+        setMedicineInfo(medicineData);
+        
+        if (medicineData.id) {
+          addRecentlyViewed(medicineData.id);
+        }
       } catch (error) {
         console.error('Error processing image:', error);
-        setError('Failed to process image. Please try again.');
+        let errorMessage = 'Failed to process image. ';
+        
+        if (error instanceof Error) {
+          if (error.message.includes('No text could be extracted')) {
+            errorMessage += 'No text could be extracted from the image. Please ensure the image is clear and contains readable text.';
+          } else if (error.message.includes('Could not identify medicine name')) {
+            errorMessage += 'Could not identify the medicine name from the image. Please ensure the medicine name is clearly visible.';
+          } else {
+            errorMessage += error.message;
+          }
+        }
+        
+        toast.error(errorMessage);
+        setImage(null);
+        setExtractedText('');
+        setMedicineInfo(null);
       }
       setLoading(false);
     }
   });
-
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    
-    setLoading(true);
-    try {
-      const response = await axios.post('/api/search', { query: searchQuery });
-      setMedicineInfo(response.data);
-      if (response.data.id) {
-        addRecentlyViewed(response.data.id);
-      }
-      setImage(null);
-      setExtractedText('');
-      
-      // Generate AI-powered information
-      await generateMedicineInfo(response.data.name);
-    } catch (error) {
-      toast.error('Error searching medicine');
-      console.error(error);
-    }
-    setLoading(false);
-  };
 
   const handleDeleteImage = () => {
     setImage(null);
@@ -343,6 +441,14 @@ export default function Home() {
                       </div>
                     ) : medicineInfo.aiGeneratedInfo ? (
                       <>
+                        <div>
+                          <h5 className="font-medium text-blue-900 mb-2">Personalized Information</h5>
+                          <div className="bg-white rounded-lg p-4 shadow-sm">
+                            <p className="text-blue-800 leading-relaxed whitespace-pre-line">
+                              {medicineInfo.aiGeneratedInfo.personalizedInfo}
+                            </p>
+                          </div>
+                        </div>
                         <div>
                           <h5 className="font-medium text-blue-900 mb-2">Primary Uses</h5>
                           <div className="bg-white rounded-lg p-4 shadow-sm">
