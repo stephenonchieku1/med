@@ -43,7 +43,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
-  const { getRootProps, getInputProps } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png']
     },
@@ -65,13 +65,35 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
         }
 
         const data = await response.json();
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `I've analyzed the image. Here's what I found:\n\n${data.overview}\n\nIngredients: ${data.ingredients.join(', ')}\n\nSide Effects: ${data.sideEffects.join(', ')}\n\nHerbal Alternatives: ${data.herbalAlternatives.join(', ')}`
-        }]);
+        
+        // Add the extracted text and analysis to the chat
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: `I've analyzed the image. Here's what I found:\n\n${data.overview}\n\nIngredients: ${data.ingredients.join(', ')}\n\nSide Effects: ${data.sideEffects.join(', ')}\n\nHerbal Alternatives: ${data.herbalAlternatives.join(', ')}`
+          }
+        ]);
+
+        // If there's extracted text, add it as a separate message
+        if (data.extractedText) {
+          setMessages(prev => [
+            ...prev,
+            {
+              role: 'assistant',
+              content: `Extracted text from the image:\n\n${data.extractedText}`
+            }
+          ]);
+        }
       } catch (error) {
         console.error('Error analyzing image:', error);
-        toast.error('Failed to analyze image');
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: 'Sorry, I encountered an error while analyzing the image. Please try again with a clearer image.'
+          }
+        ]);
       } finally {
         setIsLoading(false);
       }
