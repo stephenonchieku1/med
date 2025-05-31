@@ -338,7 +338,7 @@ export default function Home() {
           {!image ? (
             <div
               {...getRootProps()}
-              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all max-w-md mx-auto ${
+              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all max-w-md  ${
                 isDragActive 
                   ? 'border-blue-500 bg-blue-50' 
                   : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
@@ -354,7 +354,7 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <div className="relative max-w-md mx-auto">
+            <div className="relative max-w-md ">
               <div className="bg-white rounded-xl shadow-lg p-4">
                 <div className="relative w-full">
                   <div className="aspect-[3/2] w-full overflow-hidden rounded-lg bg-gray-50">
