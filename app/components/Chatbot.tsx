@@ -204,6 +204,13 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
     }
   };
 
+  const handleSampleQuestion = (question: string) => {
+    setInput(question);
+    // Create a synthetic event to trigger handleSendMessage
+    const event = new Event('submit') as unknown as React.FormEvent;
+    handleSendMessage(event);
+  };
+
   const renderInputForm = () => (
     <form onSubmit={handleSendMessage} className="flex gap-2">
       <div className="flex-1 relative">
@@ -259,19 +266,17 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
 
   if (isFixed) {
     return (
-      <div className="flex flex-col h-full">
-        <div className="flex-1 overflow-y-auto mb-4">
+      <div className={`flex flex-col h-full ${isFixed ? 'h-[300px]' : 'h-screen'}`}>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.map((message, index) => (
             <div
               key={index}
-              className={`mb-4 ${
-                message.role === 'user' ? 'text-right' : 'text-left'
-              }`}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`inline-block p-3 rounded-lg ${
+                className={`max-w-[80%] rounded-lg p-3 ${
                   message.role === 'user'
-                    ? 'bg-primary text-white'
+                    ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-800'
                 }`}
               >
@@ -280,20 +285,59 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
             </div>
           ))}
           {isLoading && (
-            <div className="text-left mb-4">
-              <div className="inline-block p-3 rounded-lg bg-gray-100 text-gray-800">
+            <div className="flex justify-start">
+              <div className="bg-gray-100 rounded-lg p-3 text-gray-800">
                 <div className="flex space-x-2">
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
                 </div>
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
-        <div className="p-4 border-t">
-          {renderInputForm()}
+
+        {/* Sample Questions */}
+        <div className="px-4 py-2 border-t border-gray-200">
+          <div className="flex flex-wrap gap-2 mb-2">
+            <button
+              onClick={() => handleSampleQuestion("What are the common side effects of paracetamol?")}
+              className="text-sm bg-blue-50 text-blue-600 px-3 py-1 rounded-full hover:bg-blue-100 transition-colors"
+            >
+              Side effects of paracetamol?
+            </button>
+            <button
+              onClick={() => handleSampleQuestion("Can I take ibuprofen with high blood pressure?")}
+              className="text-sm bg-blue-50 text-blue-600 px-3 py-1 rounded-full hover:bg-blue-100 transition-colors"
+            >
+              Ibuprofen with high BP?
+            </button>
+            <button
+              onClick={() => handleSampleQuestion("What are some natural alternatives to antibiotics?")}
+              className="text-sm bg-blue-50 text-blue-600 px-3 py-1 rounded-full hover:bg-blue-100 transition-colors"
+            >
+              Natural alternatives?
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-gray-200">
+          <form onSubmit={handleSendMessage} className="flex gap-2">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask about medicines, side effects, or alternatives..."
+              className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Send
+            </button>
+          </form>
         </div>
       </div>
     );
