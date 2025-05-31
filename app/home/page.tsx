@@ -295,7 +295,7 @@ export default function Home() {
                 {getTranslation('chatbot.title', preferences.language)}
               </h3>
             </div>
-            <div className="h-[300px] overflow-y-auto p-4">
+            <div className="h-[700px] overflow-y-auto p-4">
               <Chatbot isFixed={true} />
             </div>
           </div>
