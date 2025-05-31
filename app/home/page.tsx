@@ -93,6 +93,7 @@ export default function Home() {
       }
       setImage(null);
       setExtractedText('');
+      setSearchQuery(''); // Clear the search input after successful search
     } catch (error) {
       console.error('Error searching medicine:', error);
       toast.error('Failed to fetch medicine information');
@@ -308,6 +309,11 @@ export default function Home() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch();
+                  }
+                }}
                 placeholder={getTranslation('app.search.placeholder', preferences.language)}
                 className="w-full p-4 pl-12 border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
