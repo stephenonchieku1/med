@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useUser, Language, Diet } from '../context/UserContext';
 import { getTranslation } from '../translations';
 
@@ -547,15 +547,22 @@ const UserPreferences: React.FC = () => {
               <label key={condition} className="flex items-center space-x-2">
                 <input
                   type="checkbox"
-                  checked={preferences.healthConditions?.includes(condition) ?? false}
+                  id={`condition-${condition}`}
+                  checked={Array.isArray(preferences.healthConditions) && preferences.healthConditions.includes(condition)}
                   onChange={(e) => {
                     if (e.target.checked) {
-                      addHealthCondition(condition);
+                      setPreferences({
+                        ...preferences,
+                        healthConditions: [...(preferences.healthConditions || []), condition]
+                      });
                     } else {
-                      removeHealthCondition(condition);
+                      setPreferences({
+                        ...preferences,
+                        healthConditions: (preferences.healthConditions || []).filter(c => c !== condition)
+                      });
                     }
                   }}
-                  className="rounded text-primary focus:ring-primary"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
                 <span className="text-sm text-gray-700">{condition}</span>
               </label>
