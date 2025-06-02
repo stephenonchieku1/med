@@ -2,7 +2,24 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-export type Language = 'en' | 'es' | 'fr' | 'de' | 'zh' | 'ar' | 'hi' | 'sw' | 'pt' | 'ru' | 'ja' | 'ko' | 'it' | 'nl' | 'tr';
+export type Language = 
+  | 'en'  // English
+  | 'es'  // Spanish
+  | 'fr'  // French
+  | 'de'  // German
+  | 'zh'  // Chinese
+  | 'ar'  // Arabic
+  | 'hi'  // Hindi
+  | 'sw'  // Swahili
+  | 'pt'  // Portuguese
+  | 'ru'  // Russian
+  | 'ja'  // Japanese
+  | 'ko'  // Korean
+  | 'it'  // Italian
+  | 'nl'  // Dutch
+  | 'tr'  // Turkish
+  | 'ki'  // Kikuyu
+  | 'luo'; // Luo
 export type Diet = 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'paleo';
 export type Theme = 'light' | 'dark';
 export type FontSize = 'small' | 'medium' | 'large';
@@ -105,7 +122,18 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [allergies, setAllergies] = useState<string[]>([]);
   const [preferences, setPreferences] = useState<Preferences>(defaultPreferences);
 
+  const updateLanguage = (newLanguage: Language) => {
+    setLanguage(newLanguage);
+    setPreferences(prev => ({
+      ...prev,
+      language: newLanguage
+    }));
+  };
+
   const updatePreferences = (newPrefs: Partial<Preferences>) => {
+    if (newPrefs.language) {
+      setLanguage(newPrefs.language);
+    }
     setPreferences(prev => ({
       ...prev,
       ...newPrefs,
@@ -193,7 +221,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const addRecentlyViewed = (medicineId: string) => {
     setPreferences(prev => ({
       ...prev,
-      recentlyViewed: [...new Set([medicineId, ...prev.recentlyViewed])].slice(0, 10)
+      recentlyViewed: Array.from(new Set([medicineId, ...prev.recentlyViewed])).slice(0, 10)
     }));
   };
 
@@ -210,7 +238,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <UserContext.Provider
       value={{
         language,
-        setLanguage,
+        setLanguage: updateLanguage,
         diet,
         setDiet,
         allergies,
