@@ -349,8 +349,8 @@ export default function Home() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-3 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <p className="text-base font-medium">Drag and drop an image here, or click to select</p>
-                <p className="text-xs text-gray-500 mt-1">Supports JPG, JPEG, and PNG</p>
+                <p className="text-base font-medium">{getTranslation('app.upload.text', preferences.language)}</p>
+                <p className="text-xs text-gray-500 mt-1">{getTranslation('app.upload.supported', preferences.language)}</p>
               </div>
             </div>
           ) : (
@@ -398,7 +398,9 @@ export default function Home() {
         {/* Recommendations */}
         {recommendations.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold mb-6 text-gray-900">Recommended for You</h2>
+            <h2 className="text-2xl font-bold mb-6 text-gray-900">
+              {getTranslation('app.recommendations.title', preferences.language)}
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {recommendations.map((medicine) => (
                 <div key={medicine.id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
@@ -423,7 +425,9 @@ export default function Home() {
         {/* Extracted Text */}
         {extractedText && (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold mb-6 text-gray-900">Extracted Text</h2>
+            <h2 className="text-2xl font-bold mb-6 text-gray-900">
+              {getTranslation('app.upload.extractedText', preferences.language)}
+            </h2>
             <div className="bg-white rounded-xl shadow-lg p-6">
               <p className="whitespace-pre-wrap text-gray-700">{extractedText}</p>
             </div>
@@ -433,22 +437,30 @@ export default function Home() {
         {/* Medicine Info */}
         {medicineInfo && (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold mb-6 text-gray-900">Medicine Information</h2>
+            <h2 className="text-2xl font-bold mb-6 text-gray-900">
+              {getTranslation('app.medicine.info.title', preferences.language)}
+            </h2>
             <div className="bg-white rounded-xl shadow-lg p-6">
               <div className="mb-8">
                 <h3 className="text-2xl font-bold mb-4 text-gray-900">{medicineInfo.name}</h3>
                 <div className="bg-blue-50 rounded-xl p-6">
-                  <h4 className="text-lg font-semibold mb-3 text-blue-900">Overview</h4>
+                  <h4 className="text-lg font-semibold mb-3 text-blue-900">
+                    {getTranslation('app.medicine.overview', preferences.language)}
+                  </h4>
                   <div className="space-y-4">
                     {isGeneratingInfo ? (
                       <div className="flex items-center justify-center py-4">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                        <span className="ml-3 text-blue-800">Generating detailed information...</span>
+                        <span className="ml-3 text-blue-800">
+                          {getTranslation('app.search.loading', preferences.language)}
+                        </span>
                       </div>
                     ) : medicineInfo.aiGeneratedInfo ? (
                       <>
                         <div>
-                          <h5 className="font-medium text-blue-900 mb-2">Personalized Information</h5>
+                          <h5 className="font-medium text-blue-900 mb-2">
+                            {getTranslation('app.medicine.personalizedInfo', preferences.language)}
+                          </h5>
                           <div className="bg-white rounded-lg p-4 shadow-sm">
                             <p className="text-blue-800 leading-relaxed whitespace-pre-line">
                               {medicineInfo.aiGeneratedInfo.personalizedInfo}
@@ -456,7 +468,9 @@ export default function Home() {
                           </div>
                         </div>
                         <div>
-                          <h5 className="font-medium text-blue-900 mb-2">Primary Uses</h5>
+                          <h5 className="font-medium text-blue-900 mb-2">
+                            {getTranslation('app.medicine.primaryUses', preferences.language)}
+                          </h5>
                           <div className="bg-white rounded-lg p-4 shadow-sm">
                             <ul className="space-y-2">
                               {medicineInfo.aiGeneratedInfo.primaryUses.map((use, index) => (
@@ -469,11 +483,15 @@ export default function Home() {
                           </div>
                         </div>
                         <div>
-                          <h5 className="font-medium text-blue-900 mb-2">Conditions Treated</h5>
+                          <h5 className="font-medium text-blue-900 mb-2">
+                            {getTranslation('app.medicine.conditionsTreated', preferences.language)}
+                          </h5>
                           <div className="bg-white rounded-lg p-4 shadow-sm">
                             <div className="space-y-3">
                               <div>
-                                <h6 className="text-sm font-medium text-blue-700 mb-2">Primary Conditions:</h6>
+                                <h6 className="text-sm font-medium text-blue-700 mb-2">
+                                  {getTranslation('app.medicine.primaryUses', preferences.language)}:
+                                </h6>
                                 <ul className="space-y-2">
                                   {medicineInfo.aiGeneratedInfo.conditionsTreated.map((condition, index) => (
                                     <li key={index} className="text-blue-800 flex items-start">
@@ -484,7 +502,9 @@ export default function Home() {
                                 </ul>
                               </div>
                               <div>
-                                <h6 className="text-sm font-medium text-blue-700 mb-2">Additional Uses:</h6>
+                                <h6 className="text-sm font-medium text-blue-700 mb-2">
+                                  {getTranslation('app.medicine.additionalUses', preferences.language)}:
+                                </h6>
                                 <ul className="space-y-2">
                                   {medicineInfo.aiGeneratedInfo.additionalUses.map((use, index) => (
                                     <li key={index} className="text-blue-800 flex items-start">
@@ -498,7 +518,9 @@ export default function Home() {
                           </div>
                         </div>
                         <div>
-                          <h5 className="font-medium text-blue-900 mb-2">Mechanism of Action</h5>
+                          <h5 className="font-medium text-blue-900 mb-2">
+                            {getTranslation('app.medicine.mechanismOfAction', preferences.language)}
+                          </h5>
                           <div className="bg-white rounded-lg p-4 shadow-sm">
                             <p className="text-blue-800 leading-relaxed">
                               {medicineInfo.aiGeneratedInfo.mechanismOfAction}
@@ -506,7 +528,9 @@ export default function Home() {
                           </div>
                         </div>
                         <div>
-                          <h5 className="font-medium text-blue-900 mb-2">Dosage Information</h5>
+                          <h5 className="font-medium text-blue-900 mb-2">
+                            {getTranslation('app.medicine.dosageInfo', preferences.language)}
+                          </h5>
                           <div className="bg-white rounded-lg p-4 shadow-sm">
                             <p className="text-blue-800 leading-relaxed">
                               {medicineInfo.aiGeneratedInfo.dosageInfo}
@@ -514,7 +538,9 @@ export default function Home() {
                           </div>
                         </div>
                         <div>
-                          <h5 className="font-medium text-blue-900 mb-2">Contraindications</h5>
+                          <h5 className="font-medium text-blue-900 mb-2">
+                            {getTranslation('app.medicine.contraindications', preferences.language)}
+                          </h5>
                           <div className="bg-white rounded-lg p-4 shadow-sm">
                             <ul className="space-y-2">
                               {medicineInfo.aiGeneratedInfo.contraindications.map((contraindication, index) => (
@@ -538,10 +564,14 @@ export default function Home() {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-blue-50 rounded-xl p-4">
-                  <h4 className="font-semibold mb-3 text-blue-900">Active & Inactive Ingredients</h4>
+                  <h4 className="font-semibold mb-3 text-blue-900">
+                    {getTranslation('app.medicine.ingredients', preferences.language)}
+                  </h4>
                   <div className="space-y-3">
                     <div>
-                      <h5 className="text-sm font-medium text-blue-800 mb-1">Active Ingredients:</h5>
+                      <h5 className="text-sm font-medium text-blue-800 mb-1">
+                        {getTranslation('app.medicine.activeIngredients', preferences.language)}:
+                      </h5>
                       <ul className="space-y-1">
                         {medicineInfo.ingredients
                           .filter(ing => ing.toLowerCase().includes('active'))
@@ -554,7 +584,9 @@ export default function Home() {
                       </ul>
                     </div>
                     <div>
-                      <h5 className="text-sm font-medium text-blue-800 mb-1">Inactive Ingredients:</h5>
+                      <h5 className="text-sm font-medium text-blue-800 mb-1">
+                        {getTranslation('app.medicine.inactiveIngredients', preferences.language)}:
+                      </h5>
                       <ul className="space-y-1">
                         {medicineInfo.ingredients
                           .filter(ing => !ing.toLowerCase().includes('active'))
@@ -570,10 +602,14 @@ export default function Home() {
                 </div>
                 
                 <div className="bg-red-50 rounded-xl p-4">
-                  <h4 className="font-semibold mb-3 text-red-900">Side Effects & Warnings</h4>
+                  <h4 className="font-semibold mb-3 text-red-900">
+                    {getTranslation('app.medicine.sideEffects', preferences.language)}
+                  </h4>
                   <div className="space-y-3">
                     <div>
-                      <h5 className="text-sm font-medium text-red-800 mb-1">Common Side Effects:</h5>
+                      <h5 className="text-sm font-medium text-red-800 mb-1">
+                        {getTranslation('app.medicine.commonSideEffects', preferences.language)}:
+                      </h5>
                       <ul className="space-y-1">
                         {medicineInfo.sideEffects
                           .filter(effect => !effect.toLowerCase().includes('severe'))
@@ -586,7 +622,9 @@ export default function Home() {
                       </ul>
                     </div>
                     <div>
-                      <h5 className="text-sm font-medium text-red-800 mb-1">Severe Side Effects:</h5>
+                      <h5 className="text-sm font-medium text-red-800 mb-1">
+                        {getTranslation('app.medicine.severeSideEffects', preferences.language)}:
+                      </h5>
                       <ul className="space-y-1">
                         {medicineInfo.sideEffects
                           .filter(effect => effect.toLowerCase().includes('severe'))
@@ -602,10 +640,14 @@ export default function Home() {
                 </div>
                 
                 <div className="bg-green-50 rounded-xl p-4">
-                  <h4 className="font-semibold mb-3 text-green-900">Natural Alternatives</h4>
+                  <h4 className="font-semibold mb-3 text-green-900">
+                    {getTranslation('app.medicine.alternatives', preferences.language)}
+                  </h4>
                   <div className="space-y-3">
                     <div>
-                      <h5 className="text-sm font-medium text-green-800 mb-1">Herbal Alternatives:</h5>
+                      <h5 className="text-sm font-medium text-green-800 mb-1">
+                        {getTranslation('app.medicine.herbalAlternatives', preferences.language)}:
+                      </h5>
                       <ul className="space-y-1">
                         {medicineInfo.herbalAlternatives.map((alternative, index) => (
                           <li key={index} className="text-green-800 flex items-start">
@@ -617,7 +659,7 @@ export default function Home() {
                     </div>
                     <div className="mt-4 pt-3 border-t border-green-200">
                       <p className="text-sm text-green-800 italic">
-                        Note: Always consult with a healthcare provider before switching to herbal alternatives.
+                        {getTranslation('app.medicine.consultNote', preferences.language)}
                       </p>
                     </div>
                   </div>
@@ -627,17 +669,19 @@ export default function Home() {
               {/* Additional Information */}
               <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-gray-50 rounded-xl p-4">
-                  <h4 className="font-semibold mb-3 text-gray-900">Usage Instructions</h4>
+                  <h4 className="font-semibold mb-3 text-gray-900">
+                    {getTranslation('app.medicine.usage', preferences.language)}
+                  </h4>
                   <p className="text-gray-700">
-                    Please consult your healthcare provider for specific dosage instructions. 
-                    This information is for general reference only.
+                    {getTranslation('app.medicine.consult', preferences.language)}
                   </p>
                 </div>
                 <div className="bg-gray-50 rounded-xl p-4">
-                  <h4 className="font-semibold mb-3 text-gray-900">Precautions</h4>
+                  <h4 className="font-semibold mb-3 text-gray-900">
+                    {getTranslation('app.medicine.precautions', preferences.language)}
+                  </h4>
                   <p className="text-gray-700">
-                    Always read the label and follow the instructions carefully. 
-                    Keep out of reach of children. Store in a cool, dry place.
+                    {getTranslation('app.medicine.storage', preferences.language)}
                   </p>
                 </div>
               </div>
@@ -659,7 +703,9 @@ export default function Home() {
         {isChatOpen && (
           <div className="fixed bottom-24 right-6 w-96 bg-white rounded-xl shadow-2xl z-50">
             <div className="p-4 bg-blue-600 text-white rounded-t-xl flex justify-between items-center">
-              <h3 className="font-semibold">Chat with Medlex.ai</h3>
+              <h3 className="font-semibold">
+                {getTranslation('app.chat.title', preferences.language)}
+              </h3>
               <button
                 onClick={() => setIsChatOpen(false)}
                 className="text-white hover:text-gray-200"
