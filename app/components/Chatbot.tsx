@@ -28,13 +28,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Hello! I am your healthcare assistant. I can help you with:\n\n' +
-        '• Medicine information and side effects\n' +
-        '• Dosage recommendations\n' +
-        '• Drug interactions\n' +
-        '• Alternative treatments\n' +
-        '• General health advice\n\n' +
-        'How can I assist you today?'
+      content: getTranslation('chatbot.greeting', preferences.language)
     }
   ]);
   const [input, setInput] = useState('');
@@ -248,7 +242,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
         {isListening && (
           <div className="absolute -top-6 left-0 text-sm text-red-500 flex items-center gap-2">
             <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-            Recording...
+            {getTranslation('chatbot.recording', preferences.language)}
           </div>
         )}
       </div>
@@ -259,7 +253,10 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
           isListening ? 'bg-red-500' : 'bg-gray-200'
         } hover:bg-opacity-80 transition-colors`}
         disabled={isProcessing}
-        title={isListening ? 'Stop recording' : 'Start voice input'}
+        title={isListening ? 
+          getTranslation('chatbot.stopRecording', preferences.language) : 
+          getTranslation('chatbot.voiceInput', preferences.language)
+        }
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -291,25 +288,27 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
       <div className="flex flex-col h-[700px] bg-white rounded-xl shadow-lg overflow-hidden">
         {/* Fixed Sample Questions Section */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border-b border-gray-200">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Quick Questions</h4>
+          <h4 className="text-sm font-medium text-gray-700 mb-3">
+            {getTranslation('chatbot.quickQuestions', preferences.language)}
+          </h4>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => handleSampleQuestion("What are the common side effects of paracetamol?")}
               className="text-sm bg-white text-blue-600 px-4 py-2 rounded-full hover:bg-blue-50 transition-colors shadow-sm border border-blue-100 hover:border-blue-200"
             >
-              Side effects of paracetamol?
+              {getTranslation('chatbot.sampleQuestion1', preferences.language)}
             </button>
             <button
               onClick={() => handleSampleQuestion("Can I take ibuprofen with high blood pressure?")}
               className="text-sm bg-white text-blue-600 px-4 py-2 rounded-full hover:bg-blue-50 transition-colors shadow-sm border border-blue-100 hover:border-blue-200"
             >
-              Ibuprofen with high BP?
+              {getTranslation('chatbot.sampleQuestion2', preferences.language)}
             </button>
             <button
               onClick={() => handleSampleQuestion("What are some natural alternatives to antibiotics?")}
               className="text-sm bg-white text-blue-600 px-4 py-2 rounded-full hover:bg-blue-50 transition-colors shadow-sm border border-blue-100 hover:border-blue-200"
             >
-              Natural alternatives?
+              {getTranslation('chatbot.sampleQuestion3', preferences.language)}
             </button>
           </div>
         </div>
@@ -352,7 +351,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about medicines, side effects, or alternatives..."
+              placeholder={getTranslation('chatbot.input.placeholder', preferences.language)}
               className="flex-1 p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
             />
             <button
@@ -360,7 +359,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
               disabled={isLoading}
               className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
             >
-              Send
+              {getTranslation('chatbot.send', preferences.language)}
             </button>
           </form>
         </div>
@@ -374,25 +373,27 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
         <div className="bg-white rounded-xl shadow-xl w-96 flex flex-col h-[800px] overflow-hidden">
           {/* Fixed Sample Questions Section */}
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border-b border-gray-200">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Quick Questions</h4>
+            <h4 className="text-sm font-medium text-gray-700 mb-3">
+              {getTranslation('chatbot.quickQuestions', preferences.language)}
+            </h4>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => handleSampleQuestion("What are the common side effects of paracetamol?")}
                 className="text-sm bg-white text-blue-600 px-4 py-2 rounded-full hover:bg-blue-50 transition-colors shadow-sm border border-blue-100 hover:border-blue-200"
               >
-                Side effects of paracetamol?
+                {getTranslation('chatbot.sampleQuestion1', preferences.language)}
               </button>
               <button
                 onClick={() => handleSampleQuestion("Can I take ibuprofen with high blood pressure?")}
                 className="text-sm bg-white text-blue-600 px-4 py-2 rounded-full hover:bg-blue-50 transition-colors shadow-sm border border-blue-100 hover:border-blue-200"
               >
-                Ibuprofen with high BP?
+                {getTranslation('chatbot.sampleQuestion2', preferences.language)}
               </button>
               <button
                 onClick={() => handleSampleQuestion("What are some natural alternatives to antibiotics?")}
                 className="text-sm bg-white text-blue-600 px-4 py-2 rounded-full hover:bg-blue-50 transition-colors shadow-sm border border-blue-100 hover:border-blue-200"
               >
-                Natural alternatives?
+                {getTranslation('chatbot.sampleQuestion3', preferences.language)}
               </button>
             </div>
           </div>
@@ -435,7 +436,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about medicines, side effects, or alternatives..."
+                placeholder={getTranslation('chatbot.input.placeholder', preferences.language)}
                 className="flex-1 p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
               />
               <button
@@ -443,7 +444,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
                 disabled={isLoading}
                 className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
               >
-                Send
+                {getTranslation('chatbot.send', preferences.language)}
               </button>
             </form>
           </div>
