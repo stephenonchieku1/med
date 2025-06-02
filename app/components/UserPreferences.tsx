@@ -147,16 +147,18 @@ const UserPreferences: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 p-4" data-testid="user-preferences">
+    <div className={`space-y-6 p-4 ${preferences.theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`} data-testid="user-preferences">
       <div>
-        <label htmlFor="language" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="language" className="block text-sm font-medium">
           Language
         </label>
         <select
           id="language"
           value={language}
           onChange={(e) => setLanguage(e.target.value as Language)}
-          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
+          className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md ${
+            preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+          }`}
           data-testid="language-select"
         >
           {languages.map((lang) => (
@@ -168,14 +170,16 @@ const UserPreferences: React.FC = () => {
       </div>
 
       <div>
-        <label htmlFor="diet" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="diet" className="block text-sm font-medium">
           Dietary Preferences
         </label>
         <select
           id="diet"
           value={diet}
           onChange={(e) => setDiet(e.target.value as Diet)}
-          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
+          className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md ${
+            preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+          }`}
           data-testid="diet-select"
         >
           <option value="omnivore">Omnivore</option>
@@ -188,7 +192,7 @@ const UserPreferences: React.FC = () => {
       </div>
 
       <div>
-        <label htmlFor="allergies" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="allergies" className="block text-sm font-medium">
           Allergies
         </label>
         <input
@@ -197,14 +201,16 @@ const UserPreferences: React.FC = () => {
           value={allergies.join(', ')}
           onChange={handleAllergiesChange}
           placeholder="Enter allergies separated by commas"
-          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm"
+          className={`mt-1 block w-full border rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm ${
+            preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+          }`}
           data-testid="allergies-input"
         />
       </div>
 
       <div>
         <fieldset>
-          <legend className="text-sm font-medium text-gray-700">Taste Preferences</legend>
+          <legend className="text-sm font-medium">Taste Preferences</legend>
           <div className="mt-2 space-y-2">
             {Object.entries(preferences).map(([key, value]) => (
               <div key={key} className="flex items-center">
@@ -216,7 +222,7 @@ const UserPreferences: React.FC = () => {
                   className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                   data-testid={`preference-${key}`}
                 />
-                <label htmlFor={key} className="ml-2 block text-sm text-gray-700">
+                <label htmlFor={key} className="ml-2 block text-sm">
                   {key.charAt(0).toUpperCase() + key.slice(1)}
                 </label>
               </div>
@@ -230,11 +236,13 @@ const UserPreferences: React.FC = () => {
         <h3 className="text-lg font-medium mb-4">Basic Information</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Age Range</label>
+            <label className="block text-sm font-medium mb-2">Age Range</label>
             <select
               value={preferences.ageRange || ''}
               onChange={(e) => updatePreferences({ ageRange: e.target.value || null })}
-              className="w-full p-2 border rounded-lg"
+              className={`w-full p-2 border rounded-lg ${
+                preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+              }`}
             >
               <option value="">Select age range</option>
               {ageRanges.map(range => (
@@ -245,11 +253,13 @@ const UserPreferences: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+            <label className="block text-sm font-medium mb-2">Gender</label>
             <select
               value={preferences.gender}
               onChange={(e) => updatePreferences({ gender: e.target.value as 'male' | 'female' | 'other' })}
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className={`w-full p-2 border rounded-lg ${
+                preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+              }`}
             >
               <option value="male">Male</option>
               <option value="female">Female</option>
@@ -257,22 +267,26 @@ const UserPreferences: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Weight (kg)</label>
+            <label className="block text-sm font-medium mb-2">Weight (kg)</label>
             <input
               type="number"
               value={preferences.weight || ''}
               onChange={(e) => updatePreferences({ weight: e.target.value ? parseFloat(e.target.value) : null })}
-              className="w-full p-2 border rounded-lg"
+              className={`w-full p-2 border rounded-lg ${
+                preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+              }`}
               placeholder="Enter weight"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Height (cm)</label>
+            <label className="block text-sm font-medium mb-2">Height (cm)</label>
             <input
               type="number"
               value={preferences.height || ''}
               onChange={(e) => updatePreferences({ height: e.target.value ? parseFloat(e.target.value) : null })}
-              className="w-full p-2 border rounded-lg"
+              className={`w-full p-2 border rounded-lg ${
+                preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+              }`}
               placeholder="Enter height"
             />
           </div>
@@ -291,7 +305,7 @@ const UserPreferences: React.FC = () => {
                 onChange={(e) => updateLifestyle({ smoking: e.target.checked })}
                 className="rounded text-primary focus:ring-primary"
               />
-              <span className="text-sm font-medium text-gray-700">Smoking</span>
+              <span className="text-sm font-medium">Smoking</span>
             </label>
           </div>
           <div>
@@ -302,15 +316,17 @@ const UserPreferences: React.FC = () => {
                 onChange={(e) => updateLifestyle({ alcohol: e.target.checked })}
                 className="rounded text-primary focus:ring-primary"
               />
-              <span className="text-sm font-medium text-gray-700">Alcohol Consumption</span>
+              <span className="text-sm font-medium">Alcohol Consumption</span>
             </label>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Exercise Level</label>
+            <label className="block text-sm font-medium mb-2">Exercise Level</label>
             <select
               value={preferences.lifestyle?.exercise ?? 'none'}
               onChange={(e) => updateLifestyle({ exercise: e.target.value as 'none' | 'light' | 'moderate' | 'heavy' })}
-              className="w-full p-2 border rounded-lg"
+              className={`w-full p-2 border rounded-lg ${
+                preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+              }`}
             >
               <option value="none">None</option>
               <option value="light">Light</option>
@@ -319,11 +335,13 @@ const UserPreferences: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Diet</label>
+            <label className="block text-sm font-medium mb-2">Diet</label>
             <select
               value={preferences.lifestyle?.diet ?? 'omnivore'}
               onChange={(e) => updateLifestyle({ diet: e.target.value as Diet })}
-              className="w-full p-2 border rounded-lg"
+              className={`w-full p-2 border rounded-lg ${
+                preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+              }`}
             >
               <option value="omnivore">Omnivore</option>
               <option value="vegetarian">Vegetarian</option>
@@ -345,7 +363,9 @@ const UserPreferences: React.FC = () => {
             value={newMedication}
             onChange={(e) => setNewMedication(e.target.value)}
             placeholder="Add current medication..."
-            className="flex-1 p-2 border rounded-lg"
+            className={`flex-1 p-2 border rounded-lg ${
+              preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+            }`}
           />
           <button
             type="submit"
@@ -381,7 +401,9 @@ const UserPreferences: React.FC = () => {
             value={newMedicalHistory}
             onChange={(e) => setNewMedicalHistory(e.target.value)}
             placeholder="Add medical history..."
-            className="flex-1 p-2 border rounded-lg"
+            className={`flex-1 p-2 border rounded-lg ${
+              preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+            }`}
           />
           <button
             type="submit"
@@ -413,32 +435,38 @@ const UserPreferences: React.FC = () => {
         <h3 className="text-lg font-medium mb-2">Emergency Contact</h3>
         <form onSubmit={handleUpdateEmergencyContact} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+            <label className="block text-sm font-medium mb-2">Name</label>
             <input
               type="text"
               value={newEmergencyContact.name}
               onChange={(e) => setNewEmergencyContact(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full p-2 border rounded-lg"
+              className={`w-full p-2 border rounded-lg ${
+                preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+              }`}
               placeholder="Enter name"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Relationship</label>
+            <label className="block text-sm font-medium mb-2">Relationship</label>
             <input
               type="text"
               value={newEmergencyContact.relationship}
               onChange={(e) => setNewEmergencyContact(prev => ({ ...prev, relationship: e.target.value }))}
-              className="w-full p-2 border rounded-lg"
+              className={`w-full p-2 border rounded-lg ${
+                preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+              }`}
               placeholder="Enter relationship"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+            <label className="block text-sm font-medium mb-2">Phone</label>
             <input
               type="tel"
               value={newEmergencyContact.phone}
               onChange={(e) => setNewEmergencyContact(prev => ({ ...prev, phone: e.target.value }))}
-              className="w-full p-2 border rounded-lg"
+              className={`w-full p-2 border rounded-lg ${
+                preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+              }`}
               placeholder="Enter phone number"
             />
           </div>
@@ -456,13 +484,15 @@ const UserPreferences: React.FC = () => {
         <h3 className="text-lg font-medium mb-4">Language Settings</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium mb-2">
               Primary Language
             </label>
             <select
               value={preferences.language}
               onChange={(e) => updatePreferences({ language: e.target.value as Language })}
-              className="w-full p-2 border rounded-lg"
+              className={`w-full p-2 border rounded-lg ${
+                preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+              }`}
             >
               {languages.map((lang) => (
                 <option key={lang.code} value={lang.code}>
@@ -472,13 +502,15 @@ const UserPreferences: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium mb-2">
               Secondary Language (Optional)
             </label>
             <select
               value={preferences.secondaryLanguage || ''}
               onChange={(e) => updatePreferences({ secondaryLanguage: e.target.value as Language || null })}
-              className="w-full p-2 border rounded-lg"
+              className={`w-full p-2 border rounded-lg ${
+                preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+              }`}
             >
               <option value="">None</option>
               {languages.map((lang) => (
@@ -493,13 +525,15 @@ const UserPreferences: React.FC = () => {
 
       {/* Theme Selection */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium mb-2">
           {getTranslation('preferences.theme', preferences.language)}
         </label>
         <select
           value={preferences.theme}
           onChange={(e) => updatePreferences({ theme: e.target.value as 'light' | 'dark' })}
-          className="w-full p-2 border rounded-lg"
+          className={`w-full p-2 border rounded-lg ${
+            preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+          }`}
         >
           <option value="light">Light</option>
           <option value="dark">Dark</option>
@@ -508,13 +542,15 @@ const UserPreferences: React.FC = () => {
 
       {/* Font Size */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium mb-2">
           {getTranslation('preferences.fontSize', preferences.language)}
         </label>
         <select
           value={preferences.fontSize}
           onChange={(e) => updatePreferences({ fontSize: e.target.value as 'small' | 'medium' | 'large' })}
-          className="w-full p-2 border rounded-lg"
+          className={`w-full p-2 border rounded-lg ${
+            preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+          }`}
         >
           <option value="small">Small</option>
           <option value="medium">Medium</option>
@@ -531,7 +567,7 @@ const UserPreferences: React.FC = () => {
             onChange={(e) => updatePreferences({ notifications: e.target.checked })}
             className="rounded text-primary focus:ring-primary"
           />
-          <span className="text-sm font-medium text-gray-700">
+          <span className="text-sm font-medium">
             {getTranslation('preferences.notifications', preferences.language)}
           </span>
         </label>
@@ -541,7 +577,7 @@ const UserPreferences: React.FC = () => {
       <div className="mb-6">
         <h3 className="text-lg font-medium mb-4">Medical Conditions</h3>
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium mb-2">
             Common Conditions
           </label>
           <div className="grid grid-cols-2 gap-2">
@@ -566,13 +602,15 @@ const UserPreferences: React.FC = () => {
                   }}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-                <span className="text-sm text-gray-700">{condition}</span>
+                <span className="text-sm">
+                  {condition}
+                </span>
               </label>
             ))}
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium mb-2">
             Other Conditions
           </label>
           <form onSubmit={handleAddCondition} className="flex gap-2">
@@ -581,7 +619,9 @@ const UserPreferences: React.FC = () => {
               value={newCondition}
               onChange={(e) => setNewCondition(e.target.value)}
               placeholder="Add other condition..."
-              className="flex-1 p-2 border rounded-lg"
+              className={`flex-1 p-2 border rounded-lg ${
+                preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+              }`}
             />
             <button
               type="submit"
@@ -602,7 +642,9 @@ const UserPreferences: React.FC = () => {
             value={newAllergy}
             onChange={(e) => setNewAllergy(e.target.value)}
             placeholder="Add an allergy..."
-            className="flex-1 p-2 border rounded-lg"
+            className={`flex-1 p-2 border rounded-lg ${
+              preferences.theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-300'
+            }`}
           />
           <button
             type="submit"
