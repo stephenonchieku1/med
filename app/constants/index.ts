@@ -14,6 +14,8 @@ export const SUPPORTED_LANGUAGES = [
   { code: 'it', name: 'Italiano' },
   { code: 'nl', name: 'Nederlands' },
   { code: 'tr', name: 'Türkçe' },
+  { code: 'ki', name: 'Kikuyu' },
+  { code: 'luo', name: 'Luo' }
 ] as const;
 
 export const AGE_RANGES = [
