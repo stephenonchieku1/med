@@ -729,7 +729,7 @@ const translations: Translations = {
     nl: 'Raadpleeg uw zorgverlener voordat u dit medicijn gebruikt.',
     tr: 'Bu ilacı almadan önce lütfen sağlık hizmeti sağlayıcınıza danışın.',
     ki: 'Tafadhali shauriana na mtoa huduma ya afya waku mbere ya kũnyua dawa ĩno.',
-    luo: 'Tiyo ni konyo jadolo wuon yath moko ni nyuoyo dawa mae'
+    luo: 'Tiyo ni konyo jadolo wuon yath ni ngeche ma kipimo. Ngeche mae nĩ gik ma nyalo gik'
   },
 
   // Chatbot
