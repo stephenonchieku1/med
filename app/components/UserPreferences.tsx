@@ -53,6 +53,8 @@ const UserPreferences: React.FC = () => {
     { code: 'it', name: 'Italiano' },
     { code: 'nl', name: 'Nederlands' },
     { code: 'tr', name: 'Türkçe' },
+    { code: 'ki', name: 'Gĩkũyũ' },
+    { code: 'luo', name: 'Dholuo' }
   ];
 
   // Age range options
