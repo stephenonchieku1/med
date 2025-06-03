@@ -4,8 +4,92 @@ import axios from 'axios';
 // FDA API base URL
 const FDA_API_BASE = 'https://api.fda.gov/drug/label.json';
 
+// Helper function to summarize FDA data using AI
+async function summarizeFDAData(fdaData: any) {
+  const TOGETHER_API_KEY = process.env.TOGETHER_API_KEY;
+  const TOGETHER_API_URL = 'https://api.together.xyz/v1/chat/completions';
+
+  if (!TOGETHER_API_KEY) {
+    console.error('Together API key is not configured');
+    return null;
+  }
+
+  try {
+    // Extract all relevant text from FDA data
+    const results = fdaData.results[0];
+    const textToSummarize = `
+      Indications: ${results.indications_and_usage?.join(' ') || ''}
+      Warnings: ${results.warnings?.join(' ') || ''}
+      Adverse Reactions: ${results.adverse_reactions?.join(' ') || ''}
+      Drug Interactions: ${results.drug_interactions?.join(' ') || ''}
+      Dosage: ${results.dosage_and_administration?.join(' ') || ''}
+      Clinical Pharmacology: ${results.clinical_pharmacology?.join(' ') || ''}
+      Active Ingredients: ${results.openfda?.active_ingredient?.join(', ') || ''}
+      Inactive Ingredients: ${results.openfda?.inactive_ingredient?.join(', ') || ''}
+    `;
+
+    const response = await fetch(TOGETHER_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${TOGETHER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'mistralai/Mixtral-8x7B-Instruct-v0.1',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a medical information summarizer. Your task is to analyze FDA drug label data and provide a clear, structured summary. Format your response exactly as follows:
+
+PRIMARY USES:
+• [List 3-5 main uses in bullet points]
+
+MECHANISM OF ACTION:
+• [1-2 bullet points explaining how the drug works]
+
+DOSAGE INFORMATION:
+• [List key dosage points in bullet format]
+• Include standard adult dose
+• Include any special instructions
+• Include maximum daily dose if applicable
+
+SIDE EFFECTS:
+• Common: [List 3-5 most common side effects]
+• Serious: [List 2-3 serious side effects that need immediate attention]
+• Rare: [List 1-2 rare but important side effects]
+
+IMPORTANT WARNINGS:
+• [List 3-5 most critical warnings]
+
+DRUG INTERACTIONS:
+• [List 3-5 most important drug interactions]
+
+Use simple, patient-friendly language. Focus on the most important information. If certain information is not available, indicate "Information not provided" for that section.`
+          },
+          {
+            role: 'user',
+            content: textToSummarize
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get response from Together AI');
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error('Error summarizing FDA data:', error);
+    return null;
+  }
+}
+
 // Helper function to extract relevant information from FDA data
-function extractMedicineInfo(fdaData: any) {
+async function extractMedicineInfo(fdaData: any) {
   const results = fdaData.results[0];
   
   // Extract active ingredients
@@ -27,7 +111,10 @@ function extractMedicineInfo(fdaData: any) {
   
   // Extract indications and usage
   const indications = results.indications_and_usage || [];
-  
+
+  // Get AI-generated summary
+  const aiSummary = await summarizeFDAData(fdaData);
+
   return {
     primaryUses: indications,
     conditionsTreated: results.openfda?.indication || [],
@@ -41,7 +128,7 @@ function extractMedicineInfo(fdaData: any) {
       active: activeIngredients,
       inactive: inactiveIngredients
     },
-    personalizedInfo: `This medication is used to treat ${indications.join(', ')}. It contains the following active ingredients: ${activeIngredients.join(', ')}. Important safety information: ${warnings.join(' ')}. Common side effects may include: ${adverseReactions.join(', ')}. Always consult your healthcare provider before taking this medication.`
+    personalizedInfo: aiSummary || `This medication is used to treat ${indications.join(', ')}. It contains the following active ingredients: ${activeIngredients.join(', ')}. Important safety information: ${warnings.join(' ')}. Common side effects may include: ${adverseReactions.join(', ')}. Always consult your healthcare provider before taking this medication.`
   };
 }
 
@@ -206,7 +293,7 @@ export async function POST(request: Request) {
     }
 
     // Process FDA data
-    const medicineInfo = extractMedicineInfo(fdaData);
+    const medicineInfo = await extractMedicineInfo(fdaData);
     return NextResponse.json(medicineInfo);
 
   } catch (error) {
