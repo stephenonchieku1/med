@@ -5,20 +5,25 @@ import { useDropzone } from 'react-dropzone';
 import toast from 'react-hot-toast';
 import { useUser } from '../context/UserContext';
 import { getTranslation } from '../translations';
+import CircularProgress from './CircularProgress';
 
 interface Message {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
+  timestamp: Date;
 }
 
 interface ChatbotProps {
   isFixed?: boolean;
 }
 
-// Add type definition for SpeechRecognition
+// Add type definitions for speech recognition and synthesis
 declare global {
   interface Window {
     webkitSpeechRecognition: any;
+    SpeechRecognition: any;
+    speechSynthesis: any;
   }
 }
 
@@ -27,16 +32,22 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [messages, setMessages] = useState<Message[]>([
     {
+      id: 'initial',
       role: 'assistant',
-      content: getTranslation('chatbot.greeting', preferences.language)
+      content: getTranslation('chatbot.greeting', preferences.language),
+      timestamp: new Date()
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [transcribedText, setTranscribedText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const synthesisRef = useRef<SpeechSynthesis | null>(null);
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png']
@@ -60,22 +71,26 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
 
         const data = await response.json();
         
-        // Add the extracted text and analysis to the chat
+        // Add the analysis message
         setMessages(prev => [
           ...prev,
           {
+            id: Date.now().toString(),
             role: 'assistant',
-            content: `I've analyzed the image. Here's what I found:\n\n${data.overview}\n\nIngredients: ${data.ingredients.join(', ')}\n\nSide Effects: ${data.sideEffects.join(', ')}\n\nHerbal Alternatives: ${data.herbalAlternatives.join(', ')}`
+            content: formatImageAnalysis(data),
+            timestamp: new Date()
           }
         ]);
 
-        // If there's extracted text, add it as a separate message
+        // Add extracted text if available
         if (data.extractedText) {
           setMessages(prev => [
             ...prev,
             {
+              id: (Date.now() + 1).toString(),
               role: 'assistant',
-              content: `Extracted text from the image:\n\n${data.extractedText}`
+              content: formatExtractedText(data.extractedText),
+              timestamp: new Date()
             }
           ]);
         }
@@ -84,8 +99,10 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
         setMessages(prev => [
           ...prev,
           {
+            id: Date.now().toString(),
             role: 'assistant',
-            content: 'Sorry, I encountered an error while analyzing the image. Please try again with a clearer image.'
+            content: '• Error analyzing image\n• Please try again with a clearer image',
+            timestamp: new Date()
           }
         ]);
       } finally {
@@ -94,10 +111,11 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
     }
   });
 
+  // Initialize speech recognition
   useEffect(() => {
-    // Initialize speech recognition
-    if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
-      const SpeechRecognition = window.webkitSpeechRecognition;
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
@@ -107,32 +125,98 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
         const transcript = Array.from(event.results)
           .map((result: any) => result[0].transcript)
           .join('');
-        setInput(transcript);
+          setTranscribedText(transcript);
       };
 
       recognitionRef.current.onerror = (event: any) => {
         console.error('Speech recognition error:', event.error);
-        if (event.error === 'no-speech') {
-          // Don't stop recording on no-speech error
-          return;
-        }
         setIsListening(false);
+          setTranscribedText('');
       };
 
       recognitionRef.current.onend = () => {
-        // Only stop if we explicitly called stop()
         if (isListening) {
-          recognitionRef.current.start();
-        }
-      };
+            // If we have transcribed text and recording stopped, send it
+            if (transcribedText.trim()) {
+              handleSendMessage(transcribedText);
+              setTranscribedText('');
+            }
+            setIsListening(false);
+          }
+        };
+      }
+
+      // Initialize speech synthesis
+      synthesisRef.current = window.speechSynthesis;
     }
 
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
+      if (synthesisRef.current) {
+        synthesisRef.current.cancel();
+      }
     };
-  }, [preferences.language, isListening]);
+  }, [preferences.language, isListening, transcribedText]);
+
+  // Function to speak text
+  const speakText = (text: string, messageId: string) => {
+    if (!synthesisRef.current) return;
+
+    // If already speaking this message, stop it
+    if (isSpeaking && speakingMessageId === messageId) {
+      synthesisRef.current.cancel();
+      setIsSpeaking(false);
+      setSpeakingMessageId(null);
+      return;
+    }
+
+    // Cancel any ongoing speech
+    synthesisRef.current.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = preferences.language;
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+      setSpeakingMessageId(messageId);
+    };
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setSpeakingMessageId(null);
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      setSpeakingMessageId(null);
+    };
+
+    synthesisRef.current.speak(utterance);
+  };
+
+  // Toggle voice input
+  const toggleVoiceInput = () => {
+    if (!recognitionRef.current) {
+      toast.error('Speech recognition is not supported in your browser');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      // Send the transcribed text if it exists
+      if (transcribedText.trim()) {
+        handleSendMessage(transcribedText);
+      }
+      setTranscribedText('');
+    } else {
+      setTranscribedText('');
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -142,38 +226,20 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
     scrollToBottom();
   }, [messages]);
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      alert('Speech recognition is not supported in your browser.');
-      return;
-    }
+  const handleSendMessage = async (message: string) => {
+    if (!message.trim()) return;
 
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-      // Clear the input when stopping recording
-      setInput('');
-    } else {
-      recognitionRef.current.start();
-      setIsListening(true);
-    }
-  };
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isProcessing) return;
-
-    const userMessage = input.trim();
-    setInput('');
     setIsProcessing(true);
-    
-    // Stop recording if it's active
-    if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    }
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      content: message,
+      role: 'user',
+      timestamp: new Date(),
+    };
 
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setMessages(prev => [...prev, newMessage]);
+    setInput(''); // Clear input after sending
+    setTranscribedText(''); // Clear transcribed text after sending
 
     try {
       const response = await fetch('/api/chat', {
@@ -182,32 +248,46 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: userMessage,
+          message,
           language: preferences.language,
-          userContext: {
-            age: preferences.age,
-            gender: preferences.gender,
             healthConditions: preferences.healthConditions,
             allergies: preferences.allergies,
-            currentMedications: preferences.currentMedications,
-            medicalHistory: preferences.medicalHistory,
-            lifestyle: preferences.lifestyle
-          }
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        throw new Error('Failed to get response');
       }
 
       const data = await response.json();
-      setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+      
+      // Format the response into bullet points and remove MedLex AI prefix
+      const formattedResponse = data.response
+        .replace(/^MedLex AI:\s*/i, '') // Remove MedLex AI prefix
+        .split('\n')
+        .filter(line => line.trim())
+        .map(line => {
+          if (!line.trim().startsWith('•') && !line.trim().startsWith('-')) {
+            return `• ${line.trim()}`;
+          }
+          return line.trim();
+        })
+        .join('\n');
+
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: formattedResponse,
+        role: 'assistant',
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, botMessage]);
+      
+      // Speak the response with the message ID
+      speakText(formattedResponse.replace(/•/g, ''), botMessage.id);
     } catch (error) {
       console.error('Error sending message:', error);
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: getTranslation('chatbot.error', preferences.language) 
-      }]);
+      toast.error(getTranslation('chatbot.error', preferences.language));
     } finally {
       setIsProcessing(false);
     }
@@ -216,7 +296,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage(e);
+      handleSendMessage(input);
     }
   };
 
@@ -224,18 +304,30 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
     setInput(question);
     // Create a synthetic event to trigger handleSendMessage
     const event = new Event('submit') as unknown as React.FormEvent;
-    handleSendMessage(event);
+    handleSendMessage(question);
   };
 
   const renderInputForm = () => (
-    <form onSubmit={handleSendMessage} className="flex gap-2">
+    <form onSubmit={(e) => { 
+      e.preventDefault(); 
+      const messageToSend = isListening ? transcribedText : input;
+      if (messageToSend.trim()) {
+        if (isListening) {
+          toggleVoiceInput(); // This will stop recording and send the message
+        } else {
+          handleSendMessage(messageToSend);
+        }
+      }
+    }} className="flex gap-2">
       <div className="flex-1 relative">
         <input
           type="text"
-          value={input}
+          value={isListening ? transcribedText : input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder={getTranslation('chatbot.input.placeholder', preferences.language)}
+          placeholder={isListening ? 
+            getTranslation('chatbot.listening', preferences.language) : 
+            getTranslation('chatbot.input.placeholder', preferences.language)
+          }
           className="w-full p-2 border rounded-lg"
           disabled={isProcessing}
         />
@@ -248,7 +340,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
       </div>
       <button
         type="button"
-        onClick={toggleListening}
+        onClick={toggleVoiceInput}
         className={`p-2 rounded-lg ${
           isListening ? 'bg-red-500' : 'bg-gray-200'
         } hover:bg-opacity-80 transition-colors`}
@@ -275,12 +367,107 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
       </button>
       <button
         type="submit"
-        disabled={isProcessing || !input.trim()}
-        className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+        disabled={isProcessing || (!input.trim() && !transcribedText.trim())}
+        className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
       >
-        {getTranslation('chatbot.send', preferences.language)}
+        {isProcessing ? (
+          <>
+            <CircularProgress size={16} color="text-white" />
+            {getTranslation('chatbot.processing', preferences.language)}
+          </>
+        ) : (
+          getTranslation('chatbot.send', preferences.language)
+        )}
       </button>
     </form>
+  );
+
+  // Update the image analysis response formatting
+  const formatImageAnalysis = (data: any) => {
+    const formatList = (items: string[]) => 
+      items.map(item => `• ${item.trim()}`).join('\n');
+
+    return `• Overview\n${formatList(data.overview.split('\n'))}\n\n• Ingredients\n${formatList(data.ingredients)}\n\n• Side Effects\n${formatList(data.sideEffects)}\n\n• Herbal Alternatives\n${formatList(data.herbalAlternatives)}`;
+  };
+
+  // Update the extracted text formatting
+  const formatExtractedText = (text: string) => {
+    return text.split('\n')
+      .filter(line => line.trim())
+      .map(line => `• ${line.trim()}`)
+      .join('\n');
+  };
+
+  // Update the messages rendering to use the new renderMessage function
+  const renderMessages = () => (
+    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {messages.map((message) => renderMessage(message))}
+      {isProcessing && (
+        <div className="flex justify-start">
+          <div className="bg-gray-50 rounded-2xl p-4 text-gray-800 shadow-sm border border-gray-100 flex items-center gap-2">
+            <CircularProgress size={20} color="text-blue-600" />
+            <span className="text-sm text-gray-600">
+              {getTranslation('chatbot.processing', preferences.language)}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // Update the renderMessage function to include the message ID in the speak button
+  const renderMessage = (message: Message) => (
+    <div
+      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
+    >
+      <div
+        className={`max-w-[80%] rounded-2xl p-4 ${
+          message.role === 'user'
+            ? 'bg-blue-600 text-white shadow-md'
+            : 'bg-gray-50 text-gray-800 shadow-sm border border-gray-100'
+        }`}
+      >
+        <div className="flex items-start gap-2">
+          <div className="flex-1">{message.content}</div>
+          {message.role === 'assistant' && (
+            <button
+              onClick={() => speakText(message.content.replace(/•/g, ''), message.id)}
+              className={`p-1 rounded-full ${
+                isSpeaking && speakingMessageId === message.id ? 'bg-blue-100' : 'hover:bg-gray-100'
+              } transition-colors`}
+              title={isSpeaking && speakingMessageId === message.id ? 
+                getTranslation('chatbot.stopSpeaking', preferences.language) : 
+                getTranslation('chatbot.speak', preferences.language)
+              }
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                {isSpeaking && speakingMessageId === message.id ? (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                ) : (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 001.414 1.414m2.828-9.9a9 9 0 012.728-2.728"
+                  />
+                )}
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 
   if (isFixed) {
@@ -313,55 +500,11 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
           </div>
         </div>
 
-        {/* Scrollable Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[80%] rounded-2xl p-4 ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-gray-50 text-gray-800 shadow-sm border border-gray-100'
-                }`}
-              >
-                {message.content}
-              </div>
-            </div>
-          ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-gray-50 rounded-2xl p-4 text-gray-800 shadow-sm border border-gray-100">
-                <div className="flex space-x-2">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce delay-100"></div>
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce delay-200"></div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        {renderMessages()}
 
         {/* Fixed Input Area */}
         <div className="p-4 border-t border-gray-200 bg-white">
-          <form onSubmit={handleSendMessage} className="flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={getTranslation('chatbot.input.placeholder', preferences.language)}
-              className="flex-1 p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
-            />
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
-            >
-              {getTranslation('chatbot.send', preferences.language)}
-            </button>
-          </form>
+          {renderInputForm()}
         </div>
       </div>
     );
@@ -371,7 +514,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
     <div className="fixed bottom-4 right-4">
       {isOpen ? (
         <div className="bg-white rounded-xl shadow-xl w-96 flex flex-col h-[800px] overflow-hidden">
-          {/* Fixed Sample Questions Section */}
+          {/* Floating Sample Questions Section */}
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border-b border-gray-200">
             <h4 className="text-sm font-medium text-gray-700 mb-3">
               {getTranslation('chatbot.quickQuestions', preferences.language)}
@@ -398,55 +541,11 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
             </div>
           </div>
 
-          {/* Scrollable Messages Area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-2xl p-4 ${
-                    message.role === 'user'
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'bg-gray-50 text-gray-800 shadow-sm border border-gray-100'
-                  }`}
-                >
-                  {message.content}
-                </div>
-              </div>
-            ))}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-50 rounded-2xl p-4 text-gray-800 shadow-sm border border-gray-100">
-                  <div className="flex space-x-2">
-                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce delay-100"></div>
-                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce delay-200"></div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          {renderMessages()}
 
-          {/* Fixed Input Area */}
+          {/* Floating Input Area */}
           <div className="p-4 border-t border-gray-200 bg-white">
-            <form onSubmit={handleSendMessage} className="flex gap-2">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={getTranslation('chatbot.input.placeholder', preferences.language)}
-                className="flex-1 p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
-              />
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
-              >
-                {getTranslation('chatbot.send', preferences.language)}
-              </button>
-            </form>
+            {renderInputForm()}
           </div>
         </div>
       ) : (
