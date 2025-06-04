@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import axios from 'axios';
 import Chatbot from '../components/Chatbot';
 import UserPreferences from '../components/UserPreferences';
+import CircularProgress from '../components/CircularProgress';
 import { useUser } from '../context/UserContext';
 import { getTranslation } from '../translations';
 
@@ -41,18 +42,20 @@ export default function Home() {
   const [extractedText, setExtractedText] = useState<string>('');
   const [medicineInfo, setMedicineInfo] = useState<MedicineInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(false);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [isScanning, setIsScanning] = useState<boolean>(false);
   const [recommendations, setRecommendations] = useState<MedicineInfo[]>([]);
   const [showPreferences, setShowPreferences] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isGeneratingInfo, setIsGeneratingInfo] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     
-    setLoading(true);
+    setIsSearching(true);
     try {
       // Generate medicine information
       const response = await axios.post('/api/generate-medicine-info', {
@@ -64,11 +67,14 @@ export default function Home() {
         return;
       }
 
+      // Format the overview in the specified structure
+      const formattedOverview = `USES\n${response.data.primaryUses.slice(0, 3).map((use: string) => `• ${use}`).join('\n')}\n\nMECHANISM\n• ${response.data.mechanismOfAction}\n\nDOSAGE\n${response.data.dosageInfo.split('\n').slice(0, 2).map((dosage: string) => `• ${dosage}`).join('\n')}\n\nSIDE EFFECTS\n${response.data.sideEffects.slice(0, 3).map((effect: string) => `• ${effect}`).join('\n')}\n\nWARNINGS\n${response.data.contraindications.slice(0, 3).map((warning: string) => `• ${warning}`).join('\n')}`;
+
       // Create a complete medicine info object
       const medicineData = {
         id: searchQuery.toLowerCase(),
         name: searchQuery,
-        overview: response.data.personalizedInfo,
+        overview: formattedOverview,
         ingredients: [
           ...response.data.ingredients.active.map((ing: string) => `Active: ${ing}`),
           ...response.data.ingredients.inactive.map((ing: string) => `Inactive: ${ing}`)
@@ -82,7 +88,7 @@ export default function Home() {
           mechanismOfAction: response.data.mechanismOfAction,
           dosageInfo: response.data.dosageInfo,
           contraindications: response.data.contraindications,
-          personalizedInfo: response.data.personalizedInfo
+          personalizedInfo: formattedOverview
         }
       };
       
@@ -98,7 +104,7 @@ export default function Home() {
       console.error('Error searching medicine:', error);
       toast.error('Failed to fetch medicine information');
     }
-    setLoading(false);
+    setIsSearching(false);
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -110,8 +116,9 @@ export default function Home() {
       const file = acceptedFiles[0];
       const imageUrl = URL.createObjectURL(file);
       setImage(imageUrl);
+      setSelectedImage(file);
       
-      setLoading(true);
+      setIsScanning(true);
       try {
         // Extract text from image
         const worker = await createWorker() as unknown as TesseractWorker;
@@ -221,7 +228,7 @@ export default function Home() {
         setExtractedText('');
         setMedicineInfo(null);
       }
-      setLoading(false);
+      setIsScanning(false);
     }
   });
 
@@ -229,6 +236,40 @@ export default function Home() {
     setImage(null);
     setExtractedText('');
     setMedicineInfo(null);
+  };
+
+  const handleScan = async () => {
+    if (!selectedImage) return;
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedImage);
+
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to analyze image');
+      }
+
+      const data = await response.json();
+      setMedicineInfo({
+        id: 'scanned',
+        name: 'Scanned Medicine',
+        overview: data.overview,
+        ingredients: data.ingredients || [],
+        sideEffects: data.sideEffects || [],
+        herbalAlternatives: data.herbalAlternatives || [],
+        aiGeneratedInfo: data.aiGeneratedInfo
+      });
+    } catch (error) {
+      console.error('Error scanning image:', error);
+      toast.error(getTranslation('app.search.error', preferences.language));
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   useEffect(() => {
@@ -316,6 +357,7 @@ export default function Home() {
                 }}
                 placeholder={getTranslation('app.search.placeholder', preferences.language)}
                 className="w-full p-4 pl-12 border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                disabled={isSearching}
               />
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -323,12 +365,22 @@ export default function Home() {
             </div>
             <button
               onClick={handleSearch}
-              className="px-6 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-lg flex items-center gap-2"
+              disabled={isSearching || !searchQuery.trim()}
+              className="px-6 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>{getTranslation('app.search.button', preferences.language)}</span>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
+              {isSearching ? (
+                <>
+                  <CircularProgress size={20} color="text-white" />
+                  <span>{getTranslation('app.search.processing', preferences.language)}</span>
+                </>
+              ) : (
+                <>
+                  <span>{getTranslation('app.search.button', preferences.language)}</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -354,7 +406,7 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <div className="relative max-w-md ">
+            <div className="relative max-w-md">
               <div className="bg-white rounded-xl shadow-lg p-4">
                 <div className="relative w-full">
                   <div className="aspect-[3/2] w-full overflow-hidden rounded-lg bg-gray-50">
@@ -367,6 +419,7 @@ export default function Home() {
                       onClick={handleDeleteImage}
                       className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
                       title="Delete image"
+                      disabled={isScanning}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -383,6 +436,7 @@ export default function Home() {
                       setMedicineInfo(null);
                     }}
                     className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1"
+                    disabled={isScanning}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -394,6 +448,29 @@ export default function Home() {
             </div>
           )}
         </div>
+
+        {/* Loading States */}
+        {isSearching && (
+          <div className="mt-8 bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-center gap-3">
+              <CircularProgress size={24} color="text-blue-600" />
+              <span className="text-gray-600">
+                {getTranslation('app.search.processing', preferences.language)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {isScanning && (
+          <div className="mt-8 bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-center gap-3">
+              <CircularProgress size={24} color="text-blue-600" />
+              <span className="text-gray-600">
+                {getTranslation('scan.processing', preferences.language)}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Recommendations */}
         {recommendations.length > 0 && (
@@ -467,91 +544,6 @@ export default function Home() {
                             </p>
                           </div>
                         </div>
-                        <div>
-                          <h5 className="font-medium text-blue-900 mb-2">
-                            {getTranslation('app.medicine.primaryUses', preferences.language)}
-                          </h5>
-                          <div className="bg-white rounded-lg p-4 shadow-sm">
-                            <ul className="space-y-2">
-                              {medicineInfo.aiGeneratedInfo.primaryUses.map((use, index) => (
-                                <li key={index} className="text-blue-800 flex items-start">
-                                  <span className="text-blue-500 mr-2">•</span>
-                                  {use}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                        <div>
-                          <h5 className="font-medium text-blue-900 mb-2">
-                            {getTranslation('app.medicine.conditionsTreated', preferences.language)}
-                          </h5>
-                          <div className="bg-white rounded-lg p-4 shadow-sm">
-                            <div className="space-y-3">
-                              <div>
-                                <h6 className="text-sm font-medium text-blue-700 mb-2">
-                                  {getTranslation('app.medicine.primaryUses', preferences.language)}:
-                                </h6>
-                                <ul className="space-y-2">
-                                  {medicineInfo.aiGeneratedInfo.conditionsTreated.map((condition, index) => (
-                                    <li key={index} className="text-blue-800 flex items-start">
-                                      <span className="text-blue-500 mr-2">•</span>
-                                      {condition}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                              <div>
-                                <h6 className="text-sm font-medium text-blue-700 mb-2">
-                                  {getTranslation('app.medicine.additionalUses', preferences.language)}:
-                                </h6>
-                                <ul className="space-y-2">
-                                  {medicineInfo.aiGeneratedInfo.additionalUses.map((use, index) => (
-                                    <li key={index} className="text-blue-800 flex items-start">
-                                      <span className="text-blue-500 mr-2">•</span>
-                                      {use}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <div>
-                          <h5 className="font-medium text-blue-900 mb-2">
-                            {getTranslation('app.medicine.mechanismOfAction', preferences.language)}
-                          </h5>
-                          <div className="bg-white rounded-lg p-4 shadow-sm">
-                            <p className="text-blue-800 leading-relaxed">
-                              {medicineInfo.aiGeneratedInfo.mechanismOfAction}
-                            </p>
-                          </div>
-                        </div>
-                        <div>
-                          <h5 className="font-medium text-blue-900 mb-2">
-                            {getTranslation('app.medicine.dosageInfo', preferences.language)}
-                          </h5>
-                          <div className="bg-white rounded-lg p-4 shadow-sm">
-                            <p className="text-blue-800 leading-relaxed">
-                              {medicineInfo.aiGeneratedInfo.dosageInfo}
-                            </p>
-                          </div>
-                        </div>
-                        <div>
-                          <h5 className="font-medium text-blue-900 mb-2">
-                            {getTranslation('app.medicine.contraindications', preferences.language)}
-                          </h5>
-                          <div className="bg-white rounded-lg p-4 shadow-sm">
-                            <ul className="space-y-2">
-                              {medicineInfo.aiGeneratedInfo.contraindications.map((contraindication, index) => (
-                                <li key={index} className="text-blue-800 flex items-start">
-                                  <span className="text-blue-500 mr-2">•</span>
-                                  {contraindication}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
                       </>
                     ) : (
                       <div className="bg-white rounded-lg p-4 shadow-sm">
@@ -564,125 +556,6 @@ export default function Home() {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-blue-50 rounded-xl p-4">
-                  <h4 className="font-semibold mb-3 text-blue-900">
-                    {getTranslation('app.medicine.ingredients', preferences.language)}
-                  </h4>
-                  <div className="space-y-3">
-                    <div>
-                      <h5 className="text-sm font-medium text-blue-800 mb-1">
-                        {getTranslation('app.medicine.activeIngredients', preferences.language)}:
-                      </h5>
-                      <ul className="space-y-1">
-                        {medicineInfo.ingredients
-                          .filter(ing => ing.toLowerCase().includes('active'))
-                          .map((ingredient, index) => (
-                            <li key={index} className="text-blue-800 flex items-start">
-                              <span className="text-blue-500 mr-2">•</span>
-                              {ingredient.replace('Active:', '').trim()}
-                            </li>
-                          ))}
-                      </ul>
-                    </div>
-                    <div>
-                      <h5 className="text-sm font-medium text-blue-800 mb-1">
-                        {getTranslation('app.medicine.inactiveIngredients', preferences.language)}:
-                      </h5>
-                      <ul className="space-y-1">
-                        {medicineInfo.ingredients
-                          .filter(ing => !ing.toLowerCase().includes('active'))
-                          .map((ingredient, index) => (
-                            <li key={index} className="text-blue-800 flex items-start">
-                              <span className="text-blue-500 mr-2">•</span>
-                              {ingredient}
-                            </li>
-                          ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-red-50 rounded-xl p-4">
-                  <h4 className="font-semibold mb-3 text-red-900">
-                    {getTranslation('app.medicine.sideEffects', preferences.language)}
-                  </h4>
-                  <div className="space-y-3">
-                    <div>
-                      <h5 className="text-sm font-medium text-red-800 mb-1">
-                        {getTranslation('app.medicine.commonSideEffects', preferences.language)}:
-                      </h5>
-                      <ul className="space-y-1">
-                        {medicineInfo.sideEffects
-                          .filter(effect => !effect.toLowerCase().includes('severe'))
-                          .map((effect, index) => (
-                            <li key={index} className="text-red-800 flex items-start">
-                              <span className="text-red-500 mr-2">•</span>
-                              {effect}
-                            </li>
-                          ))}
-                      </ul>
-                    </div>
-                    <div>
-                      <h5 className="text-sm font-medium text-red-800 mb-1">
-                        {getTranslation('app.medicine.severeSideEffects', preferences.language)}:
-                      </h5>
-                      <ul className="space-y-1">
-                        {medicineInfo.sideEffects
-                          .filter(effect => effect.toLowerCase().includes('severe'))
-                          .map((effect, index) => (
-                            <li key={index} className="text-red-800 flex items-start">
-                              <span className="text-red-500 mr-2">•</span>
-                              {effect}
-                            </li>
-                          ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-green-50 rounded-xl p-4">
-                  <h4 className="font-semibold mb-3 text-green-900">
-                    {getTranslation('app.medicine.alternatives', preferences.language)}
-                  </h4>
-                  <div className="space-y-3">
-                    <div>
-                      <h5 className="text-sm font-medium text-green-800 mb-1">
-                        {getTranslation('app.medicine.herbalAlternatives', preferences.language)}:
-                      </h5>
-                      <ul className="space-y-1">
-                        {medicineInfo.herbalAlternatives.map((alternative, index) => (
-                          <li key={index} className="text-green-800 flex items-start">
-                            <span className="text-green-500 mr-2">•</span>
-                            {alternative}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div className="mt-4 pt-3 border-t border-green-200">
-                      <p className="text-sm text-green-800 italic">
-                        {getTranslation('app.medicine.consultNote', preferences.language)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Additional Information */}
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <h4 className="font-semibold mb-3 text-gray-900">
-                    {getTranslation('app.medicine.usage', preferences.language)}
-                  </h4>
-                  <p className="text-gray-700">
-                    {getTranslation('app.medicine.consult', preferences.language)}
-                  </p>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <h4 className="font-semibold mb-3 text-gray-900">
-                    {getTranslation('app.medicine.precautions', preferences.language)}
-                  </h4>
-                  <p className="text-gray-700">
-                    {getTranslation('app.medicine.storage', preferences.language)}
-                  </p>
                 </div>
               </div>
             </div>
