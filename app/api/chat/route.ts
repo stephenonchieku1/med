@@ -4,35 +4,30 @@ import { getTranslation } from '../../translations';
 const TOGETHER_API_KEY = process.env.TOGETHER_API_KEY;
 const TOGETHER_API_URL = 'https://api.together.xyz/v1/chat/completions';
 
-export async function POST(req: Request) {
+export const dynamic = 'force-dynamic';
+
+export async function POST(request: Request) {
   try {
-    const { message, language, userContext } = await req.json();
+    const body = await request.json();
+    const { message, language, healthConditions, allergies } = body;
+
+    if (!message) {
+      return NextResponse.json(
+        { error: 'Message is required' },
+        { status: 400 }
+      );
+    }
 
     // Construct a context-aware prompt
     let contextPrompt = '';
-    if (userContext) {
+    if (healthConditions?.length) {
       contextPrompt = `You are speaking with a patient with the following characteristics:\n`;
-      if (userContext.age) contextPrompt += `- Age: ${userContext.age}\n`;
-      if (userContext.gender) contextPrompt += `- Gender: ${userContext.gender}\n`;
-      if (userContext.healthConditions?.length) {
-        contextPrompt += `- Current Health Conditions: ${userContext.healthConditions.join(', ')}\n`;
-      }
-      if (userContext.allergies?.length) {
-        contextPrompt += `- Allergies: ${userContext.allergies.join(', ')}\n`;
-      }
-      if (userContext.currentMedications?.length) {
-        contextPrompt += `- Current Medications: ${userContext.currentMedications.join(', ')}\n`;
-      }
-      if (userContext.medicalHistory?.length) {
-        contextPrompt += `- Medical History: ${userContext.medicalHistory.join(', ')}\n`;
-      }
-      if (userContext.lifestyle) {
-        contextPrompt += `- Lifestyle:\n`;
-        contextPrompt += `  * Smoking: ${userContext.lifestyle.smoking ? 'Yes' : 'No'}\n`;
-        contextPrompt += `  * Alcohol: ${userContext.lifestyle.alcohol ? 'Yes' : 'No'}\n`;
-        contextPrompt += `  * Exercise Level: ${userContext.lifestyle.exercise}\n`;
-        contextPrompt += `  * Diet: ${userContext.lifestyle.diet}\n`;
-      }
+      contextPrompt += `- Current Health Conditions: ${healthConditions.join(', ')}\n`;
+    }
+    if (allergies?.length) {
+      contextPrompt += `- Allergies: ${allergies.join(', ')}\n`;
+    }
+    if (healthConditions?.length || allergies?.length) {
       contextPrompt += '\nPlease provide responses that take into account these factors and any potential interactions or considerations.\n\n';
     }
 
@@ -94,9 +89,9 @@ IMPORTANT:
     const data = await response.json();
     return NextResponse.json({ response: data.choices[0].message.content });
   } catch (error) {
-    console.error('Error in chat API:', error);
+    console.error('Error in chat route:', error);
     return NextResponse.json(
-      { error: 'Failed to process chat message' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
