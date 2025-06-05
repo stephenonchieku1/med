@@ -23,7 +23,6 @@ declare global {
   interface Window {
     webkitSpeechRecognition: any;
     SpeechRecognition: any;
-    speechSynthesis: any;
   }
 }
 
@@ -116,26 +115,26 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
     if (typeof window !== 'undefined') {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = preferences.language;
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+        recognitionRef.current.lang = preferences.language;
 
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = Array.from(event.results)
-          .map((result: any) => result[0].transcript)
-          .join('');
+        recognitionRef.current.onresult = (event: any) => {
+          const transcript = Array.from(event.results)
+            .map((result: any) => result[0].transcript)
+            .join('');
           setTranscribedText(transcript);
-      };
+        };
 
-      recognitionRef.current.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
-        setIsListening(false);
+        recognitionRef.current.onerror = (event: any) => {
+          console.error('Speech recognition error:', event.error);
+          setIsListening(false);
           setTranscribedText('');
-      };
+        };
 
-      recognitionRef.current.onend = () => {
-        if (isListening) {
+        recognitionRef.current.onend = () => {
+          if (isListening) {
             // If we have transcribed text and recording stopped, send it
             if (transcribedText.trim()) {
               handleSendMessage(transcribedText);
@@ -469,6 +468,14 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
       </div>
     </div>
   );
+
+  const handleSpeak = (text: string) => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      window.speechSynthesis.speak(utterance);
+    }
+  };
 
   if (isFixed) {
     return (
