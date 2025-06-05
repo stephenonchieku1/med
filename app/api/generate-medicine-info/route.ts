@@ -233,73 +233,33 @@ const mockDatabase = {
   }
 };
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
-    const { medicineName, extractedText, userPreferences } = await request.json();
+    const body = await request.json();
+    const { medicineName } = body;
 
-    if (!medicineName && !extractedText) {
-      return NextResponse.json({
-        error: 'Either medicine name or extracted text is required'
-      }, { status: 400 });
+    if (!medicineName) {
+      return NextResponse.json(
+        { error: 'Medicine name is required' },
+        { status: 400 }
+      );
     }
 
-    // Normalize medicine name
-    const normalizedName = (medicineName || extractedText).toLowerCase().trim();
-
-    // Try to fetch data from FDA API
-    let fdaData = null;
-    try {
-      // First try with brand name
-      const brandResponse = await axios.get(FDA_API_BASE, {
-        params: {
-          search: `brand_name:${normalizedName}`,
-          limit: 1
-        }
-      });
-      
-      if (brandResponse.data.results && brandResponse.data.results.length > 0) {
-        fdaData = brandResponse.data;
-      } else {
-        // If no results, try with generic name
-        const genericResponse = await axios.get(FDA_API_BASE, {
-          params: {
-            search: `generic_name:${normalizedName}`,
-            limit: 1
-          }
-        });
-        
-        if (genericResponse.data.results && genericResponse.data.results.length > 0) {
-          fdaData = genericResponse.data;
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching from FDA API:', error);
-    }
-
-    // If FDA API doesn't have data, use our mock database
-    if (!fdaData) {
-      // Try to find a match in the mock database
-      const mockInfo = Object.entries(mockDatabase).find(([key]) => 
-        normalizedName.includes(key) || key.includes(normalizedName)
-      )?.[1];
-
-      if (!mockInfo) {
-        return NextResponse.json({
-          error: 'Medicine information not available'
-        }, { status: 404 });
-      }
-
-      return NextResponse.json(mockInfo);
-    }
-
-    // Process FDA data
-    const medicineInfo = await extractMedicineInfo(fdaData);
-    return NextResponse.json(medicineInfo);
-
+    // TODO: Implement medicine info generation logic
+    return NextResponse.json({
+      name: medicineName,
+      overview: 'Generated medicine information',
+      ingredients: [],
+      sideEffects: [],
+      herbalAlternatives: []
+    });
   } catch (error) {
     console.error('Error generating medicine info:', error);
-    return NextResponse.json({
-      error: 'Failed to generate medicine information'
-    }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 } 
