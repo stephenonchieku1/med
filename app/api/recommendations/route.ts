@@ -32,43 +32,35 @@ const medicines = [
   // Add more medicines as needed
 ];
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
-    const { healthConditions, allergies, recentlyViewed } = await request.json() as RecommendationRequest;
+    const body = await request.json();
+    const { symptoms, healthConditions, allergies } = body;
 
-    // Filter medicines based on health conditions and allergies
-    const recommendations = medicines
-      .filter(medicine => {
-        // Don't recommend medicines that are contraindicated for the user's conditions
-        const hasContraindication = medicine.contraindications.some(contra =>
-          healthConditions.some(condition => condition.toLowerCase().includes(contra.toLowerCase()))
-        );
-        if (hasContraindication) return false;
+    if (!symptoms || !Array.isArray(symptoms)) {
+      return NextResponse.json(
+        { error: 'Symptoms array is required' },
+        { status: 400 }
+      );
+    }
 
-        // Don't recommend medicines that contain allergens
-        const hasAllergen = medicine.ingredients.some(ingredient =>
-          allergies.some(allergy => ingredient.toLowerCase().includes(allergy.toLowerCase()))
-        );
-        if (hasAllergen) return false;
-
-        // Prioritize medicines that treat the user's conditions
-        const treatsCondition = medicine.conditions.some(condition =>
-          healthConditions.some(userCondition => userCondition.toLowerCase().includes(condition.toLowerCase()))
-        );
-        return treatsCondition;
-      })
-      .map(medicine => ({
-        ...medicine,
-        relevance: calculateRelevance(medicine, healthConditions, recentlyViewed),
-      }))
-      .sort((a, b) => b.relevance - a.relevance)
-      .slice(0, 5); // Return top 5 recommendations
-
-    return NextResponse.json(recommendations);
+    // TODO: Implement recommendations logic
+    return NextResponse.json({
+      recommendations: [
+        {
+          name: 'Sample Medicine',
+          description: 'Sample description',
+          dosage: 'Sample dosage',
+          warnings: ['Sample warning']
+        }
+      ]
+    });
   } catch (error) {
     console.error('Error generating recommendations:', error);
     return NextResponse.json(
-      { error: 'Failed to generate recommendations' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
