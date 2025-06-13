@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { createWorker } from 'tesseract.js';
 import toast from 'react-hot-toast';
@@ -37,20 +37,21 @@ interface TesseractWorker extends Worker {
 }
 
 export default function Home() {
-  const { preferences, addRecentlyViewed, toggleSavedMedicine } = useUser();
+  const { preferences, addRecentlyViewed } = useUser();
   const [image, setImage] = useState<string | null>(null);
   const [extractedText, setExtractedText] = useState<string>('');
   const [medicineInfo, setMedicineInfo] = useState<MedicineInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [isScanning, setIsScanning] = useState<boolean>(false);
-  const [recommendations, setRecommendations] = useState<MedicineInfo[]>([]);
   const [showPreferences, setShowPreferences] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isGeneratingInfo, setIsGeneratingInfo] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const medicineInfoRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -282,23 +283,6 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const loadRecommendations = async () => {
-      try {
-        const response = await axios.post('/api/recommendations', {
-          healthConditions: preferences.healthConditions,
-          allergies: preferences.allergies,
-          recentlyViewed: preferences.recentlyViewed,
-        });
-        setRecommendations(response.data);
-      } catch (error) {
-        console.error('Error loading recommendations:', error);
-      }
-    };
-
-    loadRecommendations();
-  }, [preferences.healthConditions, preferences.allergies, preferences.recentlyViewed]);
-
-  useEffect(() => {
     setMounted(true);
   }, []);
 
@@ -481,33 +465,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Recommendations */}
-        {recommendations.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold mb-6 text-gray-900">
-              {getTranslation('app.recommendations.title', preferences.language)}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {recommendations.map((medicine) => (
-                <div key={medicine.id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
-                  <div className="flex justify-between items-start">
-                    <h3 className="text-xl font-semibold text-gray-900">{medicine.name}</h3>
-                    <button
-                      onClick={() => toggleSavedMedicine(medicine.id)}
-                      className="text-gray-400 hover:text-blue-500 transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                      </svg>
-                    </button>
-                  </div>
-                  <p className="text-gray-600 mt-2">{medicine.overview}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Extracted Text */}
         {extractedText && (
           <div className="mb-8">
@@ -520,9 +477,9 @@ export default function Home() {
           </div>
         )}
 
-        {/* Medicine Info */}
+        {/* Medicine Info Section */}
         {medicineInfo && (
-          <div className="mb-8">
+          <div ref={medicineInfoRef} className="mt-8">
             <h2 className="text-2xl font-bold mb-6 text-gray-900">
               {getTranslation('app.medicine.info.title', preferences.language)}
             </h2>
@@ -560,11 +517,6 @@ export default function Home() {
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-blue-50 rounded-xl p-4">
                 </div>
               </div>
             </div>
