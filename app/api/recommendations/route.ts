@@ -37,26 +37,34 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { symptoms, healthConditions, allergies } = body;
+    const { healthConditions, allergies, recentlyViewed } = body;
 
-    if (!symptoms || !Array.isArray(symptoms)) {
+    if (!healthConditions || !Array.isArray(healthConditions)) {
       return NextResponse.json(
-        { error: 'Symptoms array is required' },
+        { error: 'Health conditions array is required' },
         { status: 400 }
       );
     }
 
-    // TODO: Implement recommendations logic
-    return NextResponse.json({
-      recommendations: [
-        {
-          name: 'Sample Medicine',
-          description: 'Sample description',
-          dosage: 'Sample dosage',
-          warnings: ['Sample warning']
-        }
-      ]
-    });
+    // Filter out medicines that the user is allergic to
+    const safeMedicines = medicines.filter(medicine => 
+      !allergies?.some(allergy => 
+        medicine.ingredients.some(ingredient => 
+          ingredient.toLowerCase().includes(allergy.toLowerCase())
+        )
+      )
+    );
+
+    // Calculate relevance for each medicine
+    const recommendations = safeMedicines
+      .map(medicine => ({
+        ...medicine,
+        relevance: calculateRelevance(medicine, healthConditions, recentlyViewed || [])
+      }))
+      .sort((a, b) => b.relevance - a.relevance)
+      .slice(0, 3); // Return top 3 recommendations
+
+    return NextResponse.json(recommendations);
   } catch (error) {
     console.error('Error generating recommendations:', error);
     return NextResponse.json(
