@@ -134,73 +134,42 @@ export default function Home() {
         }
         
         setExtractedText(extractedText);
-        
-        // Extract medicine name from text (improved logic)
-        const lines = extractedText.split('\n')
-          .map(line => line.trim())
-          .filter(line => line.length > 0);
-        
-        // Look for common medicine name patterns
-        const medicineNamePatterns = [
-          /(?:brand|generic|trade)\s*name:?\s*([^\n]+)/i,
-          /(?:active|main)\s*ingredient:?\s*([^\n]+)/i,
-          /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)$/m
-        ];
-        
-        let medicineName = '';
-        for (const pattern of medicineNamePatterns) {
-          const match = extractedText.match(pattern);
-          if (match && match[1]) {
-            medicineName = match[1].trim();
-            break;
-          }
-        }
-        
-        // If no pattern match, use the first non-empty line
-        if (!medicineName && lines.length > 0) {
-          medicineName = lines[0];
-        }
-        
-        if (!medicineName) {
-          throw new Error('Could not identify medicine name from the image');
-        }
-        
-        // Clean up medicine name
-        medicineName = medicineName
-          .replace(/[^\w\s-]/g, '') // Remove special characters
-          .replace(/\s+/g, ' ')     // Normalize spaces
-          .trim();
-        
-        // Generate medicine information
-        const response = await axios.post('/api/generate-medicine-info', {
-          medicineName,
-          extractedText,
-          userPreferences: preferences
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('text', extractedText);
+
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          body: formData,
         });
-        
-        if (response.data.error) {
-          throw new Error(response.data.error);
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to analyze image');
         }
 
+        const data = await response.json();
+        
+        // Format the overview in the specified structure
+        const formattedOverview = `USES\n${data.aiGeneratedInfo.primaryUses.slice(0, 3).map((use: string) => `• ${use}`).join('\n')}\n\nMECHANISM\n• ${data.aiGeneratedInfo.mechanismOfAction}\n\nDOSAGE\n${data.aiGeneratedInfo.dosageInfo.split('\n').slice(0, 2).map((dosage: string) => `• ${dosage}`).join('\n')}\n\nSIDE EFFECTS\n${data.sideEffects.slice(0, 3).map((effect: string) => `• ${effect}`).join('\n')}\n\nWARNINGS\n${data.aiGeneratedInfo.contraindications.slice(0, 3).map((warning: string) => `• ${warning}`).join('\n')}`;
+        
         // Create a complete medicine info object
         const medicineData = {
-          id: medicineName.toLowerCase(),
-          name: medicineName,
-          overview: response.data.personalizedInfo || 'Information not available',
-          ingredients: [
-            ...(response.data.ingredients?.active || []).map((ing: string) => `Active: ${ing}`),
-            ...(response.data.ingredients?.inactive || []).map((ing: string) => `Inactive: ${ing}`)
-          ],
-          sideEffects: response.data.sideEffects || ['Information not available'],
-          herbalAlternatives: response.data.herbalAlternatives || ['Information not available'],
+          id: data.name?.toLowerCase() || 'unknown',
+          name: data.name || 'Unknown Medicine',
+          overview: formattedOverview,
+          ingredients: data.ingredients || ['Information not available'],
+          sideEffects: data.sideEffects || ['Information not available'],
+          herbalAlternatives: data.herbalAlternatives || ['Information not available'],
           aiGeneratedInfo: {
-            primaryUses: response.data.primaryUses || ['Information not available'],
-            conditionsTreated: response.data.conditionsTreated || ['Information not available'],
-            additionalUses: response.data.additionalUses || ['Information not available'],
-            mechanismOfAction: response.data.mechanismOfAction || 'Information not available',
-            dosageInfo: response.data.dosageInfo || 'Information not available',
-            contraindications: response.data.contraindications || ['Information not available'],
-            personalizedInfo: response.data.personalizedInfo || 'Information not available'
+            primaryUses: data.aiGeneratedInfo.primaryUses,
+            conditionsTreated: data.aiGeneratedInfo.conditionsTreated,
+            additionalUses: data.aiGeneratedInfo.additionalUses,
+            mechanismOfAction: data.aiGeneratedInfo.mechanismOfAction,
+            dosageInfo: data.aiGeneratedInfo.dosageInfo,
+            contraindications: data.aiGeneratedInfo.contraindications,
+            personalizedInfo: formattedOverview
           }
         };
         
@@ -242,8 +211,22 @@ export default function Home() {
     if (!selectedImage) return;
     
     try {
+      // Extract text from image using Tesseract.js
+      const worker = await createWorker() as unknown as TesseractWorker;
+      await worker.loadLanguage('eng');
+      await worker.initialize('eng');
+      
+      const result = await worker.recognize(selectedImage);
+      const extractedText = result.data.text;
+      await worker.terminate();
+      
+      if (!extractedText || extractedText.trim().length === 0) {
+        throw new Error('No text could be extracted from the image');
+      }
+
       const formData = new FormData();
       formData.append('file', selectedImage);
+      formData.append('text', extractedText);
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -251,22 +234,48 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to analyze image');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to analyze image');
       }
 
       const data = await response.json();
-      setMedicineInfo({
-        id: 'scanned',
-        name: 'Scanned Medicine',
-        overview: data.overview,
-        ingredients: data.ingredients || [],
-        sideEffects: data.sideEffects || [],
-        herbalAlternatives: data.herbalAlternatives || [],
-        aiGeneratedInfo: data.aiGeneratedInfo
-      });
+      
+      // Create a complete medicine info object
+      const medicineData = {
+        id: data.name?.toLowerCase() || 'unknown',
+        name: data.name || 'Unknown Medicine',
+        overview: data.overview || 'Information not available',
+        ingredients: data.ingredients || ['Information not available'],
+        sideEffects: data.sideEffects || ['Information not available'],
+        herbalAlternatives: data.herbalAlternatives || ['Information not available'],
+        aiGeneratedInfo: data.aiGeneratedInfo || {
+          primaryUses: ['Information not available'],
+          conditionsTreated: ['Information not available'],
+          additionalUses: ['Information not available'],
+          mechanismOfAction: 'Information not available',
+          dosageInfo: 'Information not available',
+          contraindications: ['Information not available'],
+          personalizedInfo: 'Information not available'
+        }
+      };
+      
+      setMedicineInfo(medicineData);
+      
+      if (medicineData.id) {
+        addRecentlyViewed(medicineData.id);
+      }
     } catch (error) {
-      console.error('Error scanning image:', error);
-      toast.error(getTranslation('app.search.error', preferences.language));
+      console.error('Error processing image:', error);
+      let errorMessage = 'Failed to process image. ';
+      
+      if (error instanceof Error) {
+        errorMessage += error.message;
+      }
+      
+      toast.error(errorMessage);
+      setImage(null);
+      setExtractedText('');
+      setMedicineInfo(null);
     } finally {
       setIsScanning(false);
     }
