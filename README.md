@@ -1,4 +1,4 @@
-# MediLingo
+# Medlex-ai
 
 A modern web application that helps users understand medication information through text search and image analysis.
 
