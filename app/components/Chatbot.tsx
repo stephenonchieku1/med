@@ -28,12 +28,52 @@ declare global {
 
 export default function Chatbot({ isFixed = false }: ChatbotProps) {
   const { preferences } = useUser();
+  const isDark = preferences.theme === 'dark';
+  const localeMap: Record<string, string> = {
+    en: 'en-US',
+    es: 'es-ES',
+    fr: 'fr-FR',
+    de: 'de-DE',
+    zh: 'zh-CN',
+    ar: 'ar-SA',
+    hi: 'hi-IN',
+    sw: 'sw-KE',
+    pt: 'pt-PT',
+    ru: 'ru-RU',
+    ja: 'ja-JP',
+    ko: 'ko-KR',
+    it: 'it-IT',
+    nl: 'nl-NL',
+    tr: 'tr-TR',
+    ki: 'ki-KE',
+    luo: 'luo-KE'
+  };
+  const speechLocale = localeMap[preferences.language] || 'en-US';
+
+  const compactResponse = (text: string, maxItems = 4, maxCharsPerItem = 110) => {
+    const normalized = text
+      .replace(/^MedLex AI:\s*/i, '')
+      .replace(/\r/g, '')
+      .trim();
+
+    const parts = normalized
+      .split(/\n|•|-/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    const selected = (parts.length ? parts : [normalized]).slice(0, maxItems);
+
+    return selected
+      .map((item) => (item.length > maxCharsPerItem ? `${item.slice(0, maxCharsPerItem - 1).trim()}…` : item))
+      .map((item) => (item.startsWith('•') ? item : `• ${item}`))
+      .join('\n');
+  };
   const [isOpen, setIsOpen] = useState(true);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'initial',
       role: 'assistant',
-      content: getTranslation('chatbot.greeting', preferences.language),
+      content: compactResponse(getTranslation('chatbot.greeting', preferences.language), 3, 95),
       timestamp: new Date()
     }
   ]);
@@ -118,7 +158,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
         recognitionRef.current = new SpeechRecognition();
         recognitionRef.current.continuous = true;
         recognitionRef.current.interimResults = true;
-        recognitionRef.current.lang = preferences.language;
+        recognitionRef.current.lang = speechLocale;
 
         recognitionRef.current.onresult = (event: any) => {
           const transcript = Array.from(event.results)
@@ -175,7 +215,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
     synthesisRef.current.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = preferences.language;
+    utterance.lang = speechLocale;
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
 
@@ -261,17 +301,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
       const data = await response.json();
       
       // Format the response into bullet points and remove MedLex AI prefix
-      const formattedResponse = data.response
-        .replace(/^MedLex AI:\s*/i, '') // Remove MedLex AI prefix
-        .split('\n')
-        .filter(line => line.trim())
-        .map(line => {
-          if (!line.trim().startsWith('•') && !line.trim().startsWith('-')) {
-            return `• ${line.trim()}`;
-          }
-          return line.trim();
-        })
-        .join('\n');
+      const formattedResponse = compactResponse(data.response, 4, 110);
 
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -327,7 +357,11 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
             getTranslation('chatbot.listening', preferences.language) : 
             getTranslation('chatbot.input.placeholder', preferences.language)
           }
-          className="w-full p-2 border rounded-lg"
+          className={`w-full rounded-xl border px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 ${
+            isDark
+              ? 'border-slate-700 bg-slate-900 text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:ring-cyan-900/50'
+              : 'border-slate-200 bg-white text-slate-700 focus:border-cyan-400 focus:ring-cyan-200'
+          }`}
           disabled={isProcessing}
         />
         {isListening && (
@@ -341,8 +375,8 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
         type="button"
         onClick={toggleVoiceInput}
         className={`p-2 rounded-lg ${
-          isListening ? 'bg-red-500' : 'bg-gray-200'
-        } hover:bg-opacity-80 transition-colors`}
+          isListening ? 'bg-red-500 text-white border-red-500' : isDark ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
+        } border hover:bg-opacity-80 transition-colors`}
         disabled={isProcessing}
         title={isListening ? 
           getTranslation('chatbot.stopRecording', preferences.language) : 
@@ -367,7 +401,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
       <button
         type="submit"
         disabled={isProcessing || (!input.trim() && !transcribedText.trim())}
-        className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
+        className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-2 text-white disabled:opacity-50 flex items-center gap-2 shadow-md shadow-cyan-500/20 hover:brightness-110"
       >
         {isProcessing ? (
           <>
@@ -399,14 +433,20 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
 
   // Update the messages rendering to use the new renderMessage function
   const renderMessages = () => (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className={`flex-1 overflow-y-auto px-4 py-5 space-y-4 ${
+      isDark
+        ? 'bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950'
+        : 'bg-gradient-to-b from-slate-50 to-white'
+    }`}>
       {messages.map((message) => renderMessage(message))}
       {isProcessing && (
         <div className="flex justify-start">
-          <div className="bg-gray-50 rounded-2xl p-4 text-gray-800 shadow-sm border border-gray-100 flex items-center gap-2">
+          <div className={`flex items-center gap-2 rounded-2xl border p-4 shadow-sm ${
+            isDark ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-slate-200 bg-white text-gray-800'
+          }`}>
             <CircularProgress size={20} color="text-blue-600" />
             <span className="text-sm text-gray-600">
-              {getTranslation('chatbot.processing', preferences.language)}
+                    {getTranslation('chatbot.processing', preferences.language)}
             </span>
           </div>
         </div>
@@ -420,14 +460,16 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
       className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
     >
       <div
-        className={`max-w-[80%] rounded-2xl p-4 ${
+        className={`max-w-[74%] rounded-2xl p-3 ${
           message.role === 'user'
-            ? 'bg-blue-600 text-white shadow-md'
-            : 'bg-gray-50 text-gray-800 shadow-sm border border-gray-100'
+            ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md'
+            : isDark
+            ? 'bg-slate-900 text-slate-200 shadow-sm border border-slate-700'
+            : 'bg-white text-gray-800 shadow-sm border border-slate-200'
         }`}
       >
         <div className="flex items-start gap-2">
-          <div className="flex-1">{message.content}</div>
+          <div className="flex-1 whitespace-pre-line text-[15px] leading-7">{message.content}</div>
           {message.role === 'assistant' && (
             <button
               onClick={() => speakText(message.content.replace(/•/g, ''), message.id)}
@@ -472,35 +514,62 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
   const handleSpeak = (text: string) => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
+      utterance.lang = speechLocale;
       window.speechSynthesis.speak(utterance);
     }
   };
 
   if (isFixed) {
     return (
-      <div className="flex flex-col h-[700px] bg-white rounded-xl shadow-lg overflow-hidden">
+      <div className={`flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border shadow-xl ${
+        isDark ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'
+      }`}>
         {/* Fixed Sample Questions Section */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border-b border-gray-200">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">
-            {getTranslation('chatbot.quickQuestions', preferences.language)}
-          </h4>
-          <div className="flex flex-wrap gap-2">
+        <div className={`border-b px-4 py-3 ${
+          isDark
+            ? 'border-slate-700 bg-gradient-to-r from-slate-900 to-slate-800'
+            : 'border-slate-200 bg-gradient-to-r from-cyan-50 to-blue-50'
+        }`}>
+          <div className="mb-2 flex items-center justify-between">
+            <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${
+              isDark ? 'text-cyan-300' : 'text-cyan-700'
+            }`}>
+              Quick prompts
+            </p>
+            <span className={`rounded-full px-2 py-1 text-[10px] font-medium ${
+              isDark ? 'bg-slate-700 text-slate-300' : 'bg-white/80 text-slate-500'
+            }`}>
+              Tap to ask
+            </span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
             <button
               onClick={() => handleSampleQuestion("What are the common side effects of paracetamol?")}
-              className="text-sm bg-white text-blue-600 px-4 py-2 rounded-full hover:bg-blue-50 transition-colors shadow-sm border border-blue-100 hover:border-blue-200"
+              className={`shrink-0 rounded-xl border px-3 py-2 text-xs transition ${
+                isDark
+                  ? 'border-slate-600 bg-slate-800 text-slate-200 hover:border-cyan-500 hover:text-cyan-300'
+                  : 'border-cyan-100 bg-white text-cyan-700 hover:bg-cyan-50'
+              }`}
             >
               {getTranslation('chatbot.sampleQuestion1', preferences.language)}
             </button>
             <button
               onClick={() => handleSampleQuestion("Can I take ibuprofen with high blood pressure?")}
-              className="text-sm bg-white text-blue-600 px-4 py-2 rounded-full hover:bg-blue-50 transition-colors shadow-sm border border-blue-100 hover:border-blue-200"
+              className={`shrink-0 rounded-xl border px-3 py-2 text-xs transition ${
+                isDark
+                  ? 'border-slate-600 bg-slate-800 text-slate-200 hover:border-cyan-500 hover:text-cyan-300'
+                  : 'border-cyan-100 bg-white text-cyan-700 hover:bg-cyan-50'
+              }`}
             >
               {getTranslation('chatbot.sampleQuestion2', preferences.language)}
             </button>
             <button
               onClick={() => handleSampleQuestion("What are some natural alternatives to antibiotics?")}
-              className="text-sm bg-white text-blue-600 px-4 py-2 rounded-full hover:bg-blue-50 transition-colors shadow-sm border border-blue-100 hover:border-blue-200"
+              className={`shrink-0 rounded-xl border px-3 py-2 text-xs transition ${
+                isDark
+                  ? 'border-slate-600 bg-slate-800 text-slate-200 hover:border-cyan-500 hover:text-cyan-300'
+                  : 'border-cyan-100 bg-white text-cyan-700 hover:bg-cyan-50'
+              }`}
             >
               {getTranslation('chatbot.sampleQuestion3', preferences.language)}
             </button>
@@ -510,7 +579,7 @@ export default function Chatbot({ isFixed = false }: ChatbotProps) {
         {renderMessages()}
 
         {/* Fixed Input Area */}
-        <div className="p-4 border-t border-gray-200 bg-white">
+        <div className={`border-t p-3 ${isDark ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-white'}`}>
           {renderInputForm()}
         </div>
       </div>
