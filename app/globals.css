@@ -10,4 +10,11 @@
 body {
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-rgb));
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  font-feature-settings: "cv11", "ss01";
+  font-variation-settings: "opsz" 32;
+  font-synthesis-small-caps: none;
+  font-synthesis-style: none;
+  font-synthesis-weight: none;
 } 
